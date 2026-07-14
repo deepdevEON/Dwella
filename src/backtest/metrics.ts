@@ -152,8 +152,9 @@ export class MetricsCalculator {
 
     const maxDD = equityCurve.reduce((mx, p) => Math.min(mx, p.drawdown), 0);
     const maxDrawdownPct = round2(Math.abs(maxDD));
-    const peakEquity = Math.max(...equityCurve.map(p => p.equity), initialCapital);
-    const maxDrawdownValue = round2(peakEquity - Math.min(...equityCurve.map(p => p.equity)));
+    let peak = initialCapital, maxDDval = 0;
+    for (const p of equityCurve) { peak = Math.max(peak, p.equity); maxDDval = Math.max(maxDDval, peak - p.equity); }
+    const maxDrawdownValue = round2(maxDDval);
 
     const totalReturnPct = round2(((finalEquity - initialCapital) / initialCapital) * 100);
     const days = Math.max(1, (result.endDate - result.startDate) / 86400);
@@ -208,7 +209,7 @@ function periodReturns(curve: EquityPoint[], kind: "month" | "year"): PeriodRetu
   const out: PeriodReturn[] = [];
   let prevEndEq: number | null = null;
   for (const [key, b] of [...buckets.entries()].sort()) {
-    const startEquity: number = prevEndEq ?? b.startEq;
+    const startEquity: number = b.startEq;
     const endEquity: number = curve.find(p => p.time === b.end)?.equity ?? startEquity;
     const returnPct = startEquity > 0 ? round2(((endEquity - startEquity) / startEquity) * 100) : 0;
     out.push({ key, label: key, returnPct, startEquity: round2(startEquity), endEquity: round2(endEquity) });

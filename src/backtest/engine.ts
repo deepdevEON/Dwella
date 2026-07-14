@@ -200,6 +200,7 @@ const SYMBOL_DEFAULTS: Record<string, SymbolDefaults> = {
   ES: { pointValue: 50, tickSize: 0.25, marginPerContract: 500, decimals: 2 },
   MES: { pointValue: 5, tickSize: 0.25, marginPerContract: 50, decimals: 2 },
   YM: { pointValue: 5, tickSize: 1, marginPerContract: 400, decimals: 2 },
+  M2K: { pointValue: 5, tickSize: 0.25, marginPerContract: 50, decimals: 2 },
   GC: { pointValue: 100, tickSize: 0.1, marginPerContract: 1100, decimals: 1 },
   MGC: { pointValue: 10, tickSize: 0.1, marginPerContract: 110, decimals: 1 },
   CL: { pointValue: 1000, tickSize: 0.01, marginPerContract: 700, decimals: 2 },
@@ -386,6 +387,7 @@ export class BacktestEngine {
     };
 
     // ── main simulation loop ───────────────────────────────────────────────
+    let peakEquity = initial;
     for (let i = 0; i < bars.length; i++) {
       eqIndex = i;
       const bar = bars[i];
@@ -500,8 +502,8 @@ export class BacktestEngine {
 
       // 6) record equity at this bar's close
       equity = markEquity(bar);
-      const peakSoFar = Math.max(initial, ...equityCurve.map(p => p.equity), equity);
-      const dd = peakSoFar > 0 ? (equity - peakSoFar) / peakSoFar : 0;
+      peakEquity = Math.max(peakEquity, equity);
+      const dd = peakEquity > 0 ? (equity - peakEquity) / peakEquity : 0;
       equityCurve.push({ time: bar.time, equity: round(equity), drawdown: round(dd * 100, 4), price: bar.close });
     }
 
@@ -516,8 +518,9 @@ export class BacktestEngine {
       const lastPoint = equityCurve[equityCurve.length - 1];
       if (lastPoint) {
         lastPoint.equity = round(equity);
-        const peak = Math.max(initial, ...equityCurve.map(p => p.equity));
-        lastPoint.drawdown = round(((equity - peak) / peak) * 100, 4);
+        peakEquity = Math.max(peakEquity, equity);
+        const dd = peakEquity > 0 ? (equity - peakEquity) / peakEquity : 0;
+        lastPoint.drawdown = round(dd * 100, 4);
       }
     }
 

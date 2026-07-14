@@ -8,7 +8,7 @@ import { BUILTIN_STRATEGIES, getStrategy } from "./backtest/strategies";
 import { buildHTMLReport, tradesToCSV, equityToCSV, downloadReport, downloadCSV } from "./backtest/report";
 
 const TIMEFRAMES: Timeframe[] = ["M1", "M5", "M15", "H1", "H4", "D1"];
-const SYMBOLS = ["NQ", "MNQ", "ES", "M2K", "GC", "MGC", "CL", "RTY", "YM", "EURUSD"];
+const SYMBOLS = ["NQ", "MNQ", "ES", "MES", "M2K", "GC", "MGC", "CL", "RTY", "YM", "EURUSD"];
 
 const fmtUSD = (n: number) =>
   `${n < 0 ? "-" : ""}$${Math.abs(n) >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : Math.abs(n).toFixed(2)}`;
