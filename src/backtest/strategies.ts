@@ -8,9 +8,13 @@ import type { Bar } from "../replay-engine";
 import type { Strategy, BarContext } from "./engine";
 import { GCTrendStrategy } from "../strategies/gc-trend/strategy";
 import { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
+import { NQMomentumStrategy, createNQMomentumStrategy } from "../strategies/nq-momentum/strategy";
+import { NQOptimizedStrategy, createNQOptimizedStrategy, bollingerBands } from "../strategies/nq-momentum/optimized";
 
 export { GCTrendStrategy } from "../strategies/gc-trend/strategy";
 export { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
+export { NQMomentumStrategy, createNQMomentumStrategy } from "../strategies/nq-momentum/strategy";
+export { NQOptimizedStrategy, createNQOptimizedStrategy, bollingerBands } from "../strategies/nq-momentum/optimized";
 
 export function sma(bars: Bar[], period: number, endIndex: number): number | null {
   if (endIndex + 1 < period) return null;
@@ -176,7 +180,7 @@ const mtfMomentum: Strategy = {
   },
 };
 
-export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum, GCTrendStrategy, GCBreakoutStrategy];
+export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum, GCTrendStrategy, GCBreakoutStrategy, NQMomentumStrategy, NQOptimizedStrategy];
 
 export function getStrategy(id: string): Strategy | undefined {
   return BUILTIN_STRATEGIES.find(s => s.id === id);
