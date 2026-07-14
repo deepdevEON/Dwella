@@ -4,6 +4,10 @@ import bootVideo from "./assets/boot-loop.mp4";
 import loginVideo from "./assets/login-loop.mp4";
 import CandleChart from "./CandleChart";
 import ReplayPanel from "./ReplayPanel";
+import BacktestPanel from "./BacktestPanel";
+import TradingPanel from "./TradingPanel";
+import AutoTraderPanel from "./AutoTraderPanel";
+import StrategyBuilder from "./StrategyBuilder";
 
 const baseMarkets=[{s:"NQ",n:"Nasdaq 100 E-mini",v:"—",p:"…",c:"violet"},{s:"GC",n:"Gold Futures",v:"—",p:"…",c:"gold"},{s:"ES",n:"S&P 500 E-mini",v:"—",p:"…",c:"blue"}];
 const trades=[{s:"NQ",n:"Nasdaq 100 E-mini",side:"Long",q:"2",entry:"18,512.50",exit:"18,642.75",p:"+$260.50",status:"Confirmed"},{s:"GC",n:"Gold Futures",side:"Short",q:"1",entry:"2,361.40",exit:"2,346.80",p:"+$1,460.00",status:"Protected"},{s:"ES",n:"S&P 500 E-mini",side:"Short",q:"1",entry:"5,392.50",exit:"5,382.25",p:"+$512.50",status:"Confirmed"}];
@@ -35,7 +39,7 @@ function TitleBar(){
 
 function DesktopDashboard(){
   const [status,setStatus]=useState<SystemStatus>({hermesInstalled:false,hermesRunning:false,hermesApiHealthy:false,platform:""});
-  const [panel,setPanel]=useState<"overview"|"terminal"|"replay"|"settings"|"buffy">("overview");
+  const [panel,setPanel]=useState<"overview"|"terminal"|"replay"|"settings"|"buffy"|"backtest"|"autotrader"|"builder">("overview");
   const [buffyMsgs,setBuffyMsgs]=useState<BuffyMessage[]>([]);
   const [buffySigs,setBuffySigs]=useState<BuffySignal[]>([]);
   const [buffyStatus,setBuffyStatus]=useState<"connecting"|"online"|"offline">("connecting");
@@ -104,9 +108,9 @@ function DesktopDashboard(){
     return()=>{active=false;clearInterval(id)};
   },[chartSym,chartTf]);
   return <div className="app-shell">
-    <aside className="rail"><div className="brand">d</div><nav><button className={panel==="overview"?"active":""} onClick={()=>setPanel("overview")}>▦<span>Overview</span></button><button className={panel==="terminal"?"active":""} onClick={()=>setPanel("terminal")}>◫<span>Terminal</span></button><button className={panel==="replay"?"active":""} onClick={()=>setPanel("replay")}>⏪<span>Replay</span></button><button className={panel==="buffy"?"active":""} onClick={()=>setPanel("buffy")}>✦<span>Buffy</span></button></nav><div className="rail-bottom"><button className={panel==="settings"?"active":""} onClick={()=>setPanel("settings")}>⚙<span>Settings</span></button></div></aside>
+    <aside className="rail"><div className="brand">d</div><nav><button className={panel==="overview"?"active":""} onClick={()=>setPanel("overview")}>▦<span>Overview</span></button><button className={panel==="terminal"?"active":""} onClick={()=>setPanel("terminal")}>◫<span>Terminal</span></button><button className={panel==="replay"?"active":""} onClick={()=>setPanel("replay")}>⏪<span>Replay</span></button><button className={panel==="buffy"?"active":""} onClick={()=>setPanel("buffy")}>✦<span>Buffy</span></button><button className={panel==="backtest"?"active":""} onClick={()=>setPanel("backtest")}>📈<span>Backtest</span></button><button className={panel==="autotrader"?"active":""} onClick={()=>setPanel("autotrader")}>⚡<span>AutoTrader</span></button><button className={panel==="builder"?"active":""} onClick={()=>setPanel("builder")}>⬡<span>Builder</span></button></nav><div className="rail-bottom"><button className={panel==="settings"?"active":""} onClick={()=>setPanel("settings")}>⚙<span>Settings</span></button></div></aside>
     <main className="workspace">
-      <header className="topbar"><div><p>Dwella / <b>{panel[0].toUpperCase()+panel.slice(1)}</b></p>        <h1>{panel==="overview"?"Hello Gideon":panel==="terminal"?"Trading Terminal":panel==="replay"?"Market Replay":panel==="buffy"?"Buffy":"Local Settings"}</h1>          <span>{panel==="overview"?"Your strategy is calm, protected, and ready.":panel==="terminal"?`Your broker feed wearing Dwella${account?.server?` · ${account.server}`:""}`:panel==="replay"?"Step through historical MT5 bars and practice trading.":panel==="buffy"?"Your AI trading brain, connected via Freebuff.":"Credentials stay encrypted on this device."}</span></div><div className="global-state"><span><Dot on={status.hermesApiHealthy}/>Local runtime</span><span className={`buffy-dot ${buffyStatus}`}><Dot on={buffyStatus==="online"}/>Buffy</span></div></header>
+      <header className="topbar"><div><p>Dwella / <b>{panel[0].toUpperCase()+panel.slice(1)}</b></p>        <h1>{panel==="overview"?"Hello Gideon":panel==="terminal"?"Trading Terminal":panel==="replay"?"Market Replay":panel==="buffy"?"Buffy":panel==="autotrader"?"AutoTrader":"Local Settings"}</h1>          <span>{panel==="overview"?"Your strategy is calm, protected, and ready.":panel==="terminal"?`Your broker feed wearing Dwella${account?.server?` · ${account.server}`:""}`:panel==="replay"?"Step through historical MT5 bars and practice trading.":panel==="buffy"?"Your AI trading brain, connected via Freebuff.":panel==="autotrader"?"Automated strategy execution with risk enforcement.":"Credentials stay encrypted on this device."}</span></div><div className="global-state"><span><Dot on={status.hermesApiHealthy}/>Local runtime</span><span className={`buffy-dot ${buffyStatus}`}><Dot on={buffyStatus==="online"}/>Buffy</span></div></header>
       <AnimatePresence mode="wait">
       {panel==="overview"&&<motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
         <section className="top-grid"><article className="equity glass"><div className="card-head"><span>Account equity</span><div><button>⇩ Deposit</button><button>⇧ Withdraw</button></div></div><h2>{account?.ok&&typeof account.equity==="number"?`$${fmtPrice(account.equity)}`:"$51,284.72"}</h2><p>{account?.ok&&typeof account.profit==="number"?<><b>{`${account.profit>=0?"+":"-"}$${fmtPrice(Math.abs(account.profit))}`}</b> open P&amp;L · live from MT5</>:<><b>+$1,048.72</b> this month</>}</p><div className="metrics"><span><b>2.34%</b><small>Monthly performance</small></span><span><b>75%</b><small>Strategy win rate</small></span><span><b>0.64</b><small>Market resilience</small></span><span><b>82<em>/100</em></b><small>Risk strength</small></span></div></article>
@@ -115,30 +119,18 @@ function DesktopDashboard(){
         <section className="bottom-grid"><article className="activity glass"><div className="section-head"><h3>Execution activity</h3><span>Paper trading environment</span></div><div className="trade labels"><span>Instrument</span><span>Side</span><span>Quantity</span><span>Entry</span><span>Exit</span><span>P&amp;L</span><span>Status</span></div>{trades.map(t=><div className="trade" key={t.s}><span><b>{t.s}</b><small>{t.n}</small></span><em>{t.side}</em><span>{t.q}</span><span>{t.entry}</span><span>{t.exit}</span><strong>{t.p}</strong><i>{t.status}</i></div>)}</article><article className="performance glass"><span>Strategy performance</span><h2>+7.52%</h2><h3>Momentum Flow</h3><p>NQ · ES strategy</p><svg viewBox="0 0 320 135"><path d="M0 115 C35 101 48 105 72 79 S115 91 141 60 S183 73 214 45 S260 55 320 10" fill="none" stroke="#f0a742" strokeWidth="3"/></svg></article></section>
       </motion.div>}
       {panel==="terminal"&&<motion.div key="terminal" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-        <section className="terminal glass">
-          <div className="terminal-bar">
-            <div className="tabs">{["NQ","GC","ES"].map(s=><button key={s} className={chartSym===s?"active":""} onClick={()=>setChartSym(s)}>{s}</button>)}</div>
-            <div className="terminal-quote">{(()=>{const m=markets.find(x=>x.s===chartSym);return <><b>{m?.v||"—"}</b><em>{m?.p||"…"}</em><small>{chartSource?`${chartSource} · ${chartSrc==="yahoo"?"Yahoo":chartSrc==="demo"?"Demo":"MT5"}`:"connecting"}</small></>})()}</div>
-            <div className="tabs tf">{["M1","M5","M15","H1","D1"].map(tf=><button key={tf} className={chartTf===tf?"active":""} onClick={()=>setChartTf(tf)}>{tf}</button>)}</div>
-          </div>
-          <CandleChart bars={chartBars}/>
-        </section>
-        <section className="term-grid">
-          <article className="glass term-acct">
-            <h3>Account{account?.login?` · ${account.login}`:""}</h3>
-            {account?.ok?<div className="acct-stats">
-              <span><b>${fmtPrice(account.balance||0)}</b><small>Balance</small></span>
-              <span><b>${fmtPrice(account.equity||0)}</b><small>Equity</small></span>
-              <span><b className={(account.profit||0)>=0?"pos":"neg"}>{`${(account.profit||0)>=0?"+":"-"}$${fmtPrice(Math.abs(account.profit||0))}`}</b><small>Open P&amp;L</small></span>
-              <span><b>${fmtPrice(account.marginFree||0)}</b><small>Free margin</small></span>
-            </div>:<p className="term-offline">MT5 engine offline. Open positions and equity appear when the bridge connects.</p>}
-            {account?.ok&&<small className="acct-src">{account.company} · {account.server}</small>}
-          </article>
-          <article className="glass term-poss">
-            <h3>Open positions</h3>
-            {positions.length?positions.map(p=><div className="pos-row" key={`${p.symbol}${p.entry}`}><b>{p.symbol}</b><em>{p.side}</em><span>{p.volume}</span><span>{fmtPrice(p.entry)}</span><span>{fmtPrice(p.current)}</span><strong className={p.profit>=0?"pos":"neg"}>{`${p.profit>=0?"+":"-"}$${fmtPrice(Math.abs(p.profit))}`}</strong></div>):<p className="term-offline">No open positions. Flat is a position too.</p>}
-          </article>
-        </section>
+        <TradingPanel
+          account={account}
+          positions={positions}
+          markets={markets}
+          chartSym={chartSym}
+          setChartSym={setChartSym}
+          chartTf={chartTf}
+          setChartTf={setChartTf}
+          chartBars={chartBars}
+          chartSource={chartSource}
+          chartSrc={chartSrc}
+        />
       </motion.div>}
       {panel==="buffy"&&<motion.div className="buffy-layout" key="buffy" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
         <section className="buffy-status glass">
@@ -208,6 +200,9 @@ function DesktopDashboard(){
       </motion.div>}
       {panel==="replay"&&<motion.div key="replay" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><ReplayPanel/></motion.div>}
       {panel==="settings"&&<motion.section className="settings glass" key="settings" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}><h2>Local-first security</h2><p>Dwella’s interface is bundled inside the application. Hermes is only contacted through <code>127.0.0.1:8642</code>.</p><div><span><Dot on/>Renderer sandbox</span><span><Dot on/>Context isolation</span><span><Dot on/>Node disabled in UI</span><span><Dot on={status.hermesApiHealthy}/>Hermes localhost API</span></div></motion.section>}
+      {panel==="backtest"&&<motion.div key="backtest" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><BacktestPanel/></motion.div>}
+      {panel==="autotrader"&&<motion.div key="autotrader" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><AutoTraderPanel/></motion.div>}
+      {panel==="builder"&&<motion.div key="builder" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><StrategyBuilder/></motion.div>}
       </AnimatePresence>
     </main>
   </div>

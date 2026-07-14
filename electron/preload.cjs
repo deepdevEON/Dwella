@@ -11,8 +11,21 @@ contextBridge.exposeInMainWorld("dwella", {
 
   getMarketQuotes:()=>ipcRenderer.invoke("markets:quotes"),
   getMarketBars:(s,tf,count)=>ipcRenderer.invoke("markets:bars",s,tf,count),
+  getFuturesBars:(s,tf,count)=>ipcRenderer.invoke("markets:futures-bars",s,tf,count),
+  getFuturesChain:(s)=>ipcRenderer.invoke("markets:futures-chain",s),
+  getFuturesSpec:(s)=>ipcRenderer.invoke("markets:futures-spec",s),
   getAccount:()=>ipcRenderer.invoke("markets:account"),
   getPositions:()=>ipcRenderer.invoke("markets:positions"),
+  placeMarketOrder:(data)=>ipcRenderer.invoke("orders:market",data),
+  placeLimitOrder:(data)=>ipcRenderer.invoke("orders:limit",data),
+  placeStopOrder:(data)=>ipcRenderer.invoke("orders:stop",data),
+  placeStopLimitOrder:(data)=>ipcRenderer.invoke("orders:stop-limit",data),
+  placeBracketOrder:(data)=>ipcRenderer.invoke("orders:bracket",data),
+  modifyOrder:(data)=>ipcRenderer.invoke("orders:modify",data),
+  closeOrder:(data)=>ipcRenderer.invoke("orders:close",data),
+  closeAllOrders:()=>ipcRenderer.invoke("orders:close-all"),
+  getOrderHistory:()=>ipcRenderer.invoke("orders:history"),
+  getTransactionLog:()=>ipcRenderer.invoke("orders:transactions"),
   openExternal:(url)=>ipcRenderer.invoke("shell:open",url),
 
   // ── Buffy IPC ────────────────────────────────────────────────────────
