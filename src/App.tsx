@@ -6,6 +6,7 @@ import CandleChart from "./CandleChart";
 import ReplayPanel from "./ReplayPanel";
 import BacktestPanel from "./BacktestPanel";
 import TradingPanel from "./TradingPanel";
+import AutoTraderPanel from "./AutoTraderPanel";
 
 const baseMarkets=[{s:"NQ",n:"Nasdaq 100 E-mini",v:"—",p:"…",c:"violet"},{s:"GC",n:"Gold Futures",v:"—",p:"…",c:"gold"},{s:"ES",n:"S&P 500 E-mini",v:"—",p:"…",c:"blue"}];
 const trades=[{s:"NQ",n:"Nasdaq 100 E-mini",side:"Long",q:"2",entry:"18,512.50",exit:"18,642.75",p:"+$260.50",status:"Confirmed"},{s:"GC",n:"Gold Futures",side:"Short",q:"1",entry:"2,361.40",exit:"2,346.80",p:"+$1,460.00",status:"Protected"},{s:"ES",n:"S&P 500 E-mini",side:"Short",q:"1",entry:"5,392.50",exit:"5,382.25",p:"+$512.50",status:"Confirmed"}];
@@ -37,7 +38,7 @@ function TitleBar(){
 
 function DesktopDashboard(){
   const [status,setStatus]=useState<SystemStatus>({hermesInstalled:false,hermesRunning:false,hermesApiHealthy:false,platform:""});
-  const [panel,setPanel]=useState<"overview"|"terminal"|"replay"|"settings"|"buffy"|"backtest">("overview");
+  const [panel,setPanel]=useState<"overview"|"terminal"|"replay"|"settings"|"buffy"|"backtest"|"autotrader">("overview");
   const [buffyMsgs,setBuffyMsgs]=useState<BuffyMessage[]>([]);
   const [buffySigs,setBuffySigs]=useState<BuffySignal[]>([]);
   const [buffyStatus,setBuffyStatus]=useState<"connecting"|"online"|"offline">("connecting");
@@ -106,9 +107,9 @@ function DesktopDashboard(){
     return()=>{active=false;clearInterval(id)};
   },[chartSym,chartTf]);
   return <div className="app-shell">
-    <aside className="rail"><div className="brand">d</div><nav><button className={panel==="overview"?"active":""} onClick={()=>setPanel("overview")}>▦<span>Overview</span></button><button className={panel==="terminal"?"active":""} onClick={()=>setPanel("terminal")}>◫<span>Terminal</span></button><button className={panel==="replay"?"active":""} onClick={()=>setPanel("replay")}>⏪<span>Replay</span></button><button className={panel==="buffy"?"active":""} onClick={()=>setPanel("buffy")}>✦<span>Buffy</span></button><button className={panel==="backtest"?"active":""} onClick={()=>setPanel("backtest")}>📈<span>Backtest</span></button></nav><div className="rail-bottom"><button className={panel==="settings"?"active":""} onClick={()=>setPanel("settings")}>⚙<span>Settings</span></button></div></aside>
+    <aside className="rail"><div className="brand">d</div><nav><button className={panel==="overview"?"active":""} onClick={()=>setPanel("overview")}>▦<span>Overview</span></button><button className={panel==="terminal"?"active":""} onClick={()=>setPanel("terminal")}>◫<span>Terminal</span></button><button className={panel==="replay"?"active":""} onClick={()=>setPanel("replay")}>⏪<span>Replay</span></button><button className={panel==="buffy"?"active":""} onClick={()=>setPanel("buffy")}>✦<span>Buffy</span></button><button className={panel==="backtest"?"active":""} onClick={()=>setPanel("backtest")}>📈<span>Backtest</span></button><button className={panel==="autotrader"?"active":""} onClick={()=>setPanel("autotrader")}>⚡<span>AutoTrader</span></button></nav><div className="rail-bottom"><button className={panel==="settings"?"active":""} onClick={()=>setPanel("settings")}>⚙<span>Settings</span></button></div></aside>
     <main className="workspace">
-      <header className="topbar"><div><p>Dwella / <b>{panel[0].toUpperCase()+panel.slice(1)}</b></p>        <h1>{panel==="overview"?"Hello Gideon":panel==="terminal"?"Trading Terminal":panel==="replay"?"Market Replay":panel==="buffy"?"Buffy":"Local Settings"}</h1>          <span>{panel==="overview"?"Your strategy is calm, protected, and ready.":panel==="terminal"?`Your broker feed wearing Dwella${account?.server?` · ${account.server}`:""}`:panel==="replay"?"Step through historical MT5 bars and practice trading.":panel==="buffy"?"Your AI trading brain, connected via Freebuff.":"Credentials stay encrypted on this device."}</span></div><div className="global-state"><span><Dot on={status.hermesApiHealthy}/>Local runtime</span><span className={`buffy-dot ${buffyStatus}`}><Dot on={buffyStatus==="online"}/>Buffy</span></div></header>
+      <header className="topbar"><div><p>Dwella / <b>{panel[0].toUpperCase()+panel.slice(1)}</b></p>        <h1>{panel==="overview"?"Hello Gideon":panel==="terminal"?"Trading Terminal":panel==="replay"?"Market Replay":panel==="buffy"?"Buffy":panel==="autotrader"?"AutoTrader":"Local Settings"}</h1>          <span>{panel==="overview"?"Your strategy is calm, protected, and ready.":panel==="terminal"?`Your broker feed wearing Dwella${account?.server?` · ${account.server}`:""}`:panel==="replay"?"Step through historical MT5 bars and practice trading.":panel==="buffy"?"Your AI trading brain, connected via Freebuff.":panel==="autotrader"?"Automated strategy execution with risk enforcement.":"Credentials stay encrypted on this device."}</span></div><div className="global-state"><span><Dot on={status.hermesApiHealthy}/>Local runtime</span><span className={`buffy-dot ${buffyStatus}`}><Dot on={buffyStatus==="online"}/>Buffy</span></div></header>
       <AnimatePresence mode="wait">
       {panel==="overview"&&<motion.div key="overview" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
         <section className="top-grid"><article className="equity glass"><div className="card-head"><span>Account equity</span><div><button>⇩ Deposit</button><button>⇧ Withdraw</button></div></div><h2>{account?.ok&&typeof account.equity==="number"?`$${fmtPrice(account.equity)}`:"$51,284.72"}</h2><p>{account?.ok&&typeof account.profit==="number"?<><b>{`${account.profit>=0?"+":"-"}$${fmtPrice(Math.abs(account.profit))}`}</b> open P&amp;L · live from MT5</>:<><b>+$1,048.72</b> this month</>}</p><div className="metrics"><span><b>2.34%</b><small>Monthly performance</small></span><span><b>75%</b><small>Strategy win rate</small></span><span><b>0.64</b><small>Market resilience</small></span><span><b>82<em>/100</em></b><small>Risk strength</small></span></div></article>
@@ -199,6 +200,7 @@ function DesktopDashboard(){
       {panel==="replay"&&<motion.div key="replay" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><ReplayPanel/></motion.div>}
       {panel==="settings"&&<motion.section className="settings glass" key="settings" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}><h2>Local-first security</h2><p>Dwella’s interface is bundled inside the application. Hermes is only contacted through <code>127.0.0.1:8642</code>.</p><div><span><Dot on/>Renderer sandbox</span><span><Dot on/>Context isolation</span><span><Dot on/>Node disabled in UI</span><span><Dot on={status.hermesApiHealthy}/>Hermes localhost API</span></div></motion.section>}
       {panel==="backtest"&&<motion.div key="backtest" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><BacktestPanel/></motion.div>}
+      {panel==="autotrader"&&<motion.div key="autotrader" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}><AutoTraderPanel/></motion.div>}
       </AnimatePresence>
     </main>
   </div>
