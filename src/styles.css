@@ -179,3 +179,108 @@
 .bt-muted,.muted{color:#7c7a82}
 .pos{color:#6fd8aa}.neg{color:#f18489}
 @media(max-width:1100px){.bt-results{grid-template-columns:1fr}.bt-results .bt-trades{grid-column:1}.bt-grid,.bt-params{grid-template-columns:repeat(2,1fr)}}
+
+/* ── Trading Panel ─────────────────────────────────────────── */
+.trading-panel{display:flex;flex-direction:column;gap:14px}
+.tp-top{display:grid;grid-template-columns:1.45fr 1fr;gap:14px;align-items:start}
+.tp-chart{border-radius:22px;padding:14px}
+.tp-chart .candles{height:380px}
+.tp-bottom{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;align-items:start}
+.tp-order-entry{border-radius:22px;padding:16px}
+.tp-order-entry .order-qty{flex-wrap:wrap;justify-content:flex-start}
+.tp-order-entry .order-qty button.qty-active{background:rgba(104,80,220,.3);border-color:rgba(150,130,255,.45);color:#fff}
+.tp-order-entry .risk-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.5px}
+.tp-order-entry .risk-btns{display:flex;gap:6px}
+.tp-order-entry .risk-btns button{padding:5px 10px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:transparent;color:#aaa;font-size:10px;cursor:pointer;transition:all .15s}
+.tp-order-entry .risk-btns button:hover:not(:disabled){background:rgba(104,80,220,.2);color:#ddd;border-color:rgba(150,130,255,.35)}
+.tp-order-entry .risk-btns button:disabled{opacity:.3;cursor:default}
+.tp-order-entry .entry-preview{font-size:10px;color:#777;padding:7px 11px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(255,255,255,.03);margin-bottom:10px}
+.tp-order-entry .place-order{width:100%;padding:11px;border:0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(145deg,#6b50d8,#8975ef);color:#fff;transition:all .15s}
+.tp-order-entry .place-order:hover:not(:disabled){filter:brightness(1.1)}
+.tp-order-entry .place-order:disabled{opacity:.25;cursor:default}
+.tp-msg{font-size:10px;margin-top:8px;text-align:center;min-height:14px}
+.tp-msg.pos{color:#6fd8aa}
+.tp-msg.neg{color:#f18489}
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:grid;place-items:center;backdrop-filter:blur(4px)}
+.confirm-dialog{border-radius:18px;padding:22px;background:linear-gradient(145deg,#14131a,#0e0d14);border:1px solid rgba(255,255,255,.18);box-shadow:0 24px 80px rgba(0,0,0,.5);max-width:380px;width:90%}
+.confirm-dialog h4{font:italic 20px 'Instrument Serif';margin:0 0 10px}
+.confirm-dialog p{font-size:12px;color:#aaa;margin:0 0 16px;line-height:1.5}
+.confirm-actions{display:flex;gap:10px;justify-content:flex-end}
+.confirm-cancel{padding:9px 16px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:transparent;color:#aaa;font-size:12px;cursor:pointer}
+.confirm-yes{padding:9px 16px;border:0;border-radius:10px;background:linear-gradient(145deg,#6b50d8,#8975ef);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.confirm-yes:disabled{opacity:.4;cursor:not-allowed}
+
+/* positions */
+.tp-positions{border-radius:22px;padding:16px}
+.tp-pos-table{display:flex;flex-direction:column;max-height:240px;overflow:auto;margin-top:8px}
+.tp-pos-head,.tp-pos-row{display:grid;grid-template-columns:60px 36px 36px 70px 72px 72px 44px 28px;gap:6px;align-items:center;padding:8px 4px;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:#9a989e}
+.tp-pos-head{color:#64636a;font-size:8px;text-transform:uppercase;position:sticky;top:0;background:#0c0d11;border-radius:10px 10px 0 0}
+.tp-pos-row b{color:#eee;font-style:normal}
+.tp-pos-row .pos{color:#6fd8aa}
+.tp-pos-row .neg{color:#f18489}
+.tp-pos-row .check{display:flex;align-items:center;gap:4px;font-size:9px;color:#aaa;text-transform:uppercase;cursor:pointer}
+.tp-pos-row .check input{accent-color:#9d8cff}
+.tp-pos-row .close-btn{margin-left:auto;padding:4px 8px;border:1px solid rgba(241,132,137,.25);border-radius:7px;background:rgba(241,132,137,.08);color:#f18489;font-size:9px;cursor:pointer;border:0}
+.pos-summary{display:flex;gap:12px;font-size:10px;color:#aaa}
+.pos-summary b{font:11px ui-monospace,monospace;color:#ddd;margin-left:4px}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.section-head h3{font-size:13px;font-weight:400;margin:0}
+.section-head span{font-size:10px;color:#77747e}
+
+/* watchlist */
+.tp-watchlist{border-radius:22px;padding:16px}
+.watch-controls select{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);color:#ddd;font:10px Barlow,sans-serif;padding:5px 8px;outline:none}
+.watch-add{display:flex;gap:6px;margin-bottom:10px}
+.watch-add input{flex:1;padding:8px 10px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(255,255,255,.04);color:#fff;font:11px ui-monospace,monospace;outline:none}
+.watch-add button{width:32px;height:32px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:transparent;color:#aaa;font-size:16px;cursor:pointer;display:grid;place-items:center}
+.watch-list{display:flex;flex-direction:column;max-height:200px;overflow:auto}
+.watch-row{display:grid;grid-template-columns:44px 1fr 80px 64px 28px;gap:8px;align-items:center;padding:8px 6px;border-top:1px solid rgba(255,255,255,.06);font-size:11px;cursor:pointer;transition:background .12s;border-radius:8px}
+.watch-row:hover{background:rgba(255,255,255,.04)}
+.watch-row b{color:#eee;font-style:normal}
+.watch-row .watch-name{font-size:10px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.watch-row .watch-price{font:11px ui-monospace,monospace;color:#ccc}
+.watch-row .watch-chg{font-size:11px;font-weight:600}
+.watch-row .watch-chg.pos{color:#6fd8aa}
+.watch-row .watch-chg.neg{color:#f18489}
+.watch-row .watch-remove{margin-left:auto;padding:3px 7px;border:1px solid rgba(241,132,137,.2);border-radius:6px;background:transparent;color:#f18489;font-size:9px;cursor:pointer;border:0;opacity:.6;transition:opacity .12s}
+.watch-row .watch-remove:hover{opacity:1}
+.ctx-menu{position:fixed;z-index:9999;border-radius:12px;padding:6px;background:linear-gradient(145deg,#14131a,#0e0d14);border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px;min-width:160px}
+.ctx-menu button{border:0;border-radius:8px;background:transparent;color:#ccc;font-size:11px;padding:8px 12px;cursor:pointer;text-align:left;transition:all .12s}
+.ctx-menu button:hover{background:rgba(104,80,220,.2);color:#fff}
+
+/* DOM */
+.tp-dom{border-radius:22px;padding:16px}
+.dom-ladder{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto;margin-top:4px}
+.dom-row{display:grid;grid-template-columns:80px 1fr 48px;gap:8px;align-items:center;padding:4px 6px;border-radius:7px;cursor:pointer;font-size:10px;transition:background .1s}
+.dom-row:hover{background:rgba(255,255,255,.05)}
+.dom-row.bid .dom-price{color:#6fd8aa}
+.dom-row.ask .dom-price{color:#f18489}
+.dom-price{font:10px ui-monospace,monospace;color:#ccc}
+.dom-bar-wrap{height:8px;border-radius:4px;background:rgba(255,255,255,.04);overflow:hidden}
+.dom-bar{height:100%;border-radius:4px;transition:width .3s}
+.dom-row.bid .dom-bar{background:linear-gradient(90deg,rgba(111,218,174,.25),rgba(111,218,174,.08))}
+.dom-row.ask .dom-bar{background:linear-gradient(90deg,rgba(241,132,137,.08),rgba(241,132,137,.25))}
+.dom-vol{font:10px ui-monospace,monospace;color:#888;text-align:right}
+
+/* time & sales */
+.tp-time-sales{border-radius:22px;padding:16px}
+.ts-list{display:flex;flex-direction:column;max-height:220px;overflow:auto;margin-top:4px}
+.ts-row{display:grid;grid-template-columns:60px 72px 20px 36px;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;font-size:10px;border-top:1px solid rgba(255,255,255,.04)}
+.ts-row.buy .ts-price{color:#6fd8aa}
+.ts-row.sell .ts-price{color:#f18489}
+.ts-row.ts-large{background:rgba(255,255,255,.04);font-weight:600}
+.ts-time{color:#69686e;font:9px ui-monospace,monospace}
+.ts-price{font:10px ui-monospace,monospace;color:#ccc}
+.ts-side{font-size:9px;font-weight:700;text-align:center;border-radius:4px;padding:1px 4px}
+.ts-side.buy{color:#6fd8aa;background:rgba(111,218,174,.1)}
+.ts-side.sell{color:#f18489;background:rgba(241,132,137,.1)}
+.ts-vol{font:10px ui-monospace,monospace;color:#aaa;text-align:right}
+.tp-right-stack{display:flex;flex-direction:column;gap:14px}
+
+@media(max-width:1300px){
+  .tp-top{grid-template-columns:1fr}
+  .tp-bottom{grid-template-columns:1fr}
+  .tp-right-stack{flex-direction:row;flex-wrap:wrap}
+  .tp-positions,.tp-watchlist,.tp-time-sales{flex:1 1 300px}
+}
+/* ── End Trading Panel ────────────────────────────────────── */

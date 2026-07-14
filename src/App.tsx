@@ -5,6 +5,7 @@ import loginVideo from "./assets/login-loop.mp4";
 import CandleChart from "./CandleChart";
 import ReplayPanel from "./ReplayPanel";
 import BacktestPanel from "./BacktestPanel";
+import TradingPanel from "./TradingPanel";
 
 const baseMarkets=[{s:"NQ",n:"Nasdaq 100 E-mini",v:"—",p:"…",c:"violet"},{s:"GC",n:"Gold Futures",v:"—",p:"…",c:"gold"},{s:"ES",n:"S&P 500 E-mini",v:"—",p:"…",c:"blue"}];
 const trades=[{s:"NQ",n:"Nasdaq 100 E-mini",side:"Long",q:"2",entry:"18,512.50",exit:"18,642.75",p:"+$260.50",status:"Confirmed"},{s:"GC",n:"Gold Futures",side:"Short",q:"1",entry:"2,361.40",exit:"2,346.80",p:"+$1,460.00",status:"Protected"},{s:"ES",n:"S&P 500 E-mini",side:"Short",q:"1",entry:"5,392.50",exit:"5,382.25",p:"+$512.50",status:"Confirmed"}];
@@ -116,30 +117,18 @@ function DesktopDashboard(){
         <section className="bottom-grid"><article className="activity glass"><div className="section-head"><h3>Execution activity</h3><span>Paper trading environment</span></div><div className="trade labels"><span>Instrument</span><span>Side</span><span>Quantity</span><span>Entry</span><span>Exit</span><span>P&amp;L</span><span>Status</span></div>{trades.map(t=><div className="trade" key={t.s}><span><b>{t.s}</b><small>{t.n}</small></span><em>{t.side}</em><span>{t.q}</span><span>{t.entry}</span><span>{t.exit}</span><strong>{t.p}</strong><i>{t.status}</i></div>)}</article><article className="performance glass"><span>Strategy performance</span><h2>+7.52%</h2><h3>Momentum Flow</h3><p>NQ · ES strategy</p><svg viewBox="0 0 320 135"><path d="M0 115 C35 101 48 105 72 79 S115 91 141 60 S183 73 214 45 S260 55 320 10" fill="none" stroke="#f0a742" strokeWidth="3"/></svg></article></section>
       </motion.div>}
       {panel==="terminal"&&<motion.div key="terminal" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-        <section className="terminal glass">
-          <div className="terminal-bar">
-            <div className="tabs">{["NQ","GC","ES"].map(s=><button key={s} className={chartSym===s?"active":""} onClick={()=>setChartSym(s)}>{s}</button>)}</div>
-            <div className="terminal-quote">{(()=>{const m=markets.find(x=>x.s===chartSym);return <><b>{m?.v||"—"}</b><em>{m?.p||"…"}</em><small>{chartSource?`${chartSource} · ${chartSrc==="yahoo"?"Yahoo":chartSrc==="demo"?"Demo":"MT5"}`:"connecting"}</small></>})()}</div>
-            <div className="tabs tf">{["M1","M5","M15","H1","D1"].map(tf=><button key={tf} className={chartTf===tf?"active":""} onClick={()=>setChartTf(tf)}>{tf}</button>)}</div>
-          </div>
-          <CandleChart bars={chartBars}/>
-        </section>
-        <section className="term-grid">
-          <article className="glass term-acct">
-            <h3>Account{account?.login?` · ${account.login}`:""}</h3>
-            {account?.ok?<div className="acct-stats">
-              <span><b>${fmtPrice(account.balance||0)}</b><small>Balance</small></span>
-              <span><b>${fmtPrice(account.equity||0)}</b><small>Equity</small></span>
-              <span><b className={(account.profit||0)>=0?"pos":"neg"}>{`${(account.profit||0)>=0?"+":"-"}$${fmtPrice(Math.abs(account.profit||0))}`}</b><small>Open P&amp;L</small></span>
-              <span><b>${fmtPrice(account.marginFree||0)}</b><small>Free margin</small></span>
-            </div>:<p className="term-offline">MT5 engine offline. Open positions and equity appear when the bridge connects.</p>}
-            {account?.ok&&<small className="acct-src">{account.company} · {account.server}</small>}
-          </article>
-          <article className="glass term-poss">
-            <h3>Open positions</h3>
-            {positions.length?positions.map(p=><div className="pos-row" key={`${p.symbol}${p.entry}`}><b>{p.symbol}</b><em>{p.side}</em><span>{p.volume}</span><span>{fmtPrice(p.entry)}</span><span>{fmtPrice(p.current)}</span><strong className={p.profit>=0?"pos":"neg"}>{`${p.profit>=0?"+":"-"}$${fmtPrice(Math.abs(p.profit))}`}</strong></div>):<p className="term-offline">No open positions. Flat is a position too.</p>}
-          </article>
-        </section>
+        <TradingPanel
+          account={account}
+          positions={positions}
+          markets={markets}
+          chartSym={chartSym}
+          setChartSym={setChartSym}
+          chartTf={chartTf}
+          setChartTf={setChartTf}
+          chartBars={chartBars}
+          chartSource={chartSource}
+          chartSrc={chartSrc}
+        />
       </motion.div>}
       {panel==="buffy"&&<motion.div className="buffy-layout" key="buffy" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
         <section className="buffy-status glass">
