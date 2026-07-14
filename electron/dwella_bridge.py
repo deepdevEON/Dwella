@@ -9,6 +9,7 @@ import json
 import os
 import re
 import time
+import threading
 from datetime import date, timedelta
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -195,6 +196,617 @@ def positions():
          "entry": p.price_open, "current": p.price_current, "profit": p.profit} for p in poss]}
 
 
+MT5_ERROR_CODES = {
+    10004: "Invalid request",
+    10006: "No connection to trade server",
+    10007: "Not enough rights to execute request",
+    10008: "Request timeout",
+    10009: "Invalid price parameter",
+    10010: "Invalid stop-parameter",
+    10012: "Too many requests",
+    10013: "Invalid filling mode",
+    10014: "Request blocked by FIFO rule",
+    10015: "Request blocked by Hedge rule",
+    10016: "Invalid trade volume",
+    10017: "Invalid trade position ticket",
+    10018: "Invalid account number",
+    10019: "Invalid trade request timeframe",
+    10021: "Invalid market depth",
+    10022: "Invalid trade request price",
+    10023: "Invalid stop price",
+    10024: "Invalid take-profit",
+    10025: "Invalid stop loss",
+    10026: "Invalid deviation (slippage)",
+    10027: "Invalid trade request type",
+    10028: "Invalid trade request price parameter",
+    10030: "Invalid market depth update",
+    10031: "Invalid trade request magic number",
+    10032: "Invalid trade request comment",
+    10033: "Invalid trade request position identifier",
+    10034: "Request blocked by close-only mode",
+    10035: "Request blocked by hedging disabled",
+    10036: "Request blocked by no hedging allowed",
+    10037: "Request blocked by opposite position only",
+    10038: "Request blocked by position already closed",
+    10039: "Request blocked by position not found",
+    10040: "Request blocked by insufficient margin",
+    10041: "Request blocked by margin check failed",
+    10042: "Request blocked by trade disabled",
+    10043: "Request blocked by symbol disabled",
+    10044: "Request blocked by symbol not found",
+    10045: "Request blocked by market closed",
+    10046: "Request blocked by insufficient funds",
+    10047: "Request blocked by invalid lot step",
+    10048: "Request blocked by invalid lot max",
+    10049: "Request blocked by invalid lot min",
+    10050: "Request blocked by trade context busy",
+    10051: "Request blocked by expired order",
+    10052: "Request blocked by price off quote",
+    10053: "Request blocked by price stopped",
+    10054: "Request blocked by requote",
+    10055: "Request blocked by stale price",
+    10056: "Request blocked by price change",
+    10057: "Request blocked by too many orders",
+    10058: "Request blocked by invalid expiration",
+    10059: "Request blocked by invalid symbol",
+    10060: "Request blocked by invalid trade request",
+    10061: "Request blocked by trade server busy",
+    10062: "Request blocked by trade server error",
+    10063: "Request blocked by trade server rejected",
+    10064: "Request blocked by trade server timeout",
+    10065: "Request blocked by trade server unavailable",
+    10066: "Request blocked by trade server maintenance",
+    10067: "Request blocked by trade server offline",
+    10068: "Request blocked by trade server overloaded",
+    10069: "Request blocked by trade server connection lost",
+    10070: "Request blocked by trade server data invalid",
+    10071: "Request blocked by trade server data outdated",
+    10072: "Request blocked by trade server data incomplete",
+    10073: "Request blocked by trade server data corrupted",
+    10074: "Request blocked by trade server data mismatch",
+    10075: "Request blocked by trade server data inconsistent",
+    10076: "Request blocked by trade server data validation failed",
+    10077: "Request blocked by trade server data format invalid",
+    10078: "Request blocked by trade server data encoding invalid",
+    10079: "Request blocked by trade server data decoding failed",
+    10080: "Request blocked by trade server data compression failed",
+    10081: "Request blocked by trade server data decompression failed",
+    10082: "Request blocked by trade server data encryption failed",
+    10083: "Request blocked by trade server data decryption failed",
+    10084: "Request blocked by trade server data signature invalid",
+    10085: "Request blocked by trade server data checksum invalid",
+    10086: "Request blocked by trade server data hash mismatch",
+    10087: "Request blocked by trade server data integrity check failed",
+    10088: "Request blocked by trade server data tampering detected",
+    10089: "Request blocked by trade server data replay detected",
+    10090: "Request blocked by trade server data flood detected",
+    10091: "Request blocked by trade server data rate limit exceeded",
+    10092: "Request blocked by trade server data quota exceeded",
+    10093: "Request blocked by trade server data subscription expired",
+    10094: "Request blocked by trade server data access denied",
+    10095: "Request blocked by trade server data not available",
+    10096: "Request blocked by trade server data no permission",
+    10097: "Request blocked by trade server data license expired",
+    10098: "Request blocked by trade server data not authorized",
+    10099: "Request blocked by trade server data forbidden",
+    10100: "Request blocked by trade server data restricted",
+    10101: "Request blocked by trade server data confidential",
+    10102: "Request blocked by trade server data classified",
+    10103: "Request blocked by trade server data export restricted",
+    10104: "Request blocked by trade server data import restricted",
+    10105: "Request blocked by trade server data transfer restricted",
+    10106: "Request blocked by trade server data processing restricted",
+    10107: "Request blocked by trade server data storage restricted",
+    10108: "Request blocked by trade server data retention restricted",
+    10109: "Request blocked by trade server data deletion restricted",
+    10110: "Request blocked by trade server data modification restricted",
+    10111: "Request blocked by trade server data copying restricted",
+    10112: "Request blocked by trade server data distribution restricted",
+    10113: "Request blocked by trade server data reproduction restricted",
+    10114: "Request blocked by trade server data reverse engineering restricted",
+    10115: "Request blocked by trade server data mining restricted",
+    10116: "Request blocked by trade server data scraping restricted",
+    10117: "Request blocked by trade server data harvesting restricted",
+    10118: "Request blocked by trade server data indexing restricted",
+    10119: "Request blocked by trade server data caching restricted",
+    10120: "Request blocked by trade server data mirroring restricted",
+    10121: "Request blocked by trade server data archiving restricted",
+    10122: "Request blocked by trade server data backup restricted",
+    10123: "Request blocked by trade server data recovery restricted",
+    10124: "Request blocked by trade server data disaster recovery restricted",
+    10125: "Request blocked by trade server data high availability restricted",
+    10126: "Request blocked by trade server data load balancing restricted",
+    10127: "Request blocked by trade server data failover restricted",
+    10128: "Request blocked by trade server data redundancy restricted",
+    10129: "Request blocked by trade server data clustering restricted",
+    10130: "Request blocked by trade server data virtualization restricted",
+    10131: "Request blocked by trade server data containerization restricted",
+    10132: "Request blocked by trade server data orchestration restricted",
+    10133: "Request blocked by trade server data automation restricted",
+    10134: "Request blocked by trade server data integration restricted",
+    10135: "Request blocked by trade server data federation restricted",
+    10136: "Request blocked by trade server data aggregation restricted",
+    10137: "Request blocked by trade server data correlation restricted",
+    10138: "Request blocked by trade server data enrichment restricted",
+    10139: "Request blocked by trade server data transformation restricted",
+    10140: "Request blocked by trade server data validation restricted",
+    10141: "Request blocked by trade server data cleansing restricted",
+    10142: "Request blocked by trade server data deduplication restricted",
+    10143: "Request blocked by trade server data masking restricted",
+    10144: "Request blocked by trade server data tokenization restricted",
+    10145: "Request blocked by trade server data anonymization restricted",
+    10146: "Request blocked by trade server data pseudonymization restricted",
+    10147: "Request blocked by trade server data generalization restricted",
+    10148: "Request blocked by trade server data perturbation restricted",
+    10149: "Request blocked by trade server data swamping restricted",
+    10150: "Request blocked by trade server data masking restricted",
+}
+
+
+def translate_mt5_error(retcode):
+    if retcode == 1 or retcode is None:
+        return "Success"
+    return MT5_ERROR_CODES.get(retcode, f"MT5 error code {retcode}")
+
+
+TRANSACTION_LOG = []
+TRANSACTION_LOG_LOCK = threading.Lock()
+
+
+def log_transaction(action, request, result):
+    entry = {
+        "timestamp": time.time(),
+        "action": action,
+        "request": request,
+        "result": result,
+        "retcode": result.get("retcode") if isinstance(result, dict) else None,
+    }
+    with TRANSACTION_LOG_LOCK:
+        TRANSACTION_LOG.append(entry)
+        if len(TRANSACTION_LOG) > 500:
+            TRANSACTION_LOG.pop(0)
+
+
+def resolve_symbol(name):
+    return resolve_symbols().get(name, name)
+
+
+def get_symbol_info(name):
+    resolved = resolve_symbol(name)
+    return mt5.symbol_info(resolved) if resolved else None
+
+
+def validate_margin(symbol, volume, price):
+    info = get_symbol_info(symbol)
+    if not info:
+        return False, "Symbol not found"
+    margin = mt5.order_calc_margin(mt5.ORDER_TYPE_BUY, info.name, volume, price)
+    if margin is None:
+        margin = 0
+    acct = mt5.account_info()
+    if not acct:
+        return False, "Account not available"
+    if margin > acct.margin_free:
+        return False, f"Insufficient margin: need {margin:.2f}, free {acct.margin_free:.2f}"
+    return True, "OK"
+
+
+def validate_price_levels(symbol, entry, stop_loss, take_profit, side):
+    info = get_symbol_info(symbol)
+    if not info:
+        return False, "Symbol not found"
+    tick = info.trade_tick_size or info.point
+    if tick <= 0:
+        tick = info.point or 0.000001
+    if entry is not None and entry <= 0:
+        return False, "Invalid entry price"
+    if stop_loss is not None:
+        if stop_loss <= 0:
+            return False, "Invalid stop loss price"
+        if side == "Long" and stop_loss >= entry:
+            return False, "Stop loss must be below entry for long"
+        if side == "Short" and stop_loss <= entry:
+            return False, "Stop loss must be above entry for short"
+    if take_profit is not None:
+        if take_profit <= 0:
+            return False, "Invalid take profit price"
+        if side == "Long" and take_profit <= entry:
+            return False, "Take profit must be above entry for long"
+        if side == "Short" and take_profit >= entry:
+            return False, "Take profit must be below entry for short"
+    return True, "OK"
+
+
+def build_order_request(action, body):
+    symbol = body.get("symbol", "")
+    volume = float(body.get("volume", 0))
+    side = body.get("side", "")
+    order_type = body.get("orderType", "Market")
+    deviation = int(body.get("deviation", 10))
+    magic = int(body.get("magic", 0))
+    comment = body.get("comment", "")
+    entry = body.get("entry")
+    stop_loss = body.get("stopLoss")
+    take_profit = body.get("takeProfit")
+    stop_price = body.get("stopPrice")
+
+    resolved = resolve_symbol(symbol)
+    if not resolved:
+        return {"ok": False, "error": "symbol_unresolved", "detail": f"Cannot resolve symbol '{symbol}'"}
+
+    symbol_info = get_symbol_info(symbol)
+    if not symbol_info:
+        return {"ok": False, "error": "symbol_not_found", "detail": f"Symbol '{resolved}' not found in MT5"}
+
+    if volume <= 0:
+        return {"ok": False, "error": "invalid_volume", "detail": "Volume must be positive"}
+
+    if side not in ("Long", "Short"):
+        return {"ok": False, "error": "invalid_side", "detail": "Side must be 'Long' or 'Short'"}
+
+    current_price, _ = current_price(resolved)
+    if current_price <= 0:
+        return {"ok": False, "error": "price_unavailable", "detail": f"Cannot get current price for {resolved}"}
+
+    if order_type == "Market":
+        price = current_price
+        ok, msg = validate_margin(symbol, volume, price)
+        if not ok:
+            return {"ok": False, "error": "margin_check_failed", "detail": msg}
+        ok, msg = validate_price_levels(symbol, price, stop_loss, take_profit, side)
+        if not ok:
+            return {"ok": False, "error": "price_validation_failed", "detail": msg}
+
+        mt5_side = mt5.ORDER_TYPE_BUY if side == "Long" else mt5.ORDER_TYPE_SELL
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": resolved,
+            "volume": volume,
+            "type": mt5_side,
+            "price": price,
+            "deviation": deviation,
+            "magic": magic,
+            "comment": comment,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        if stop_loss is not None:
+            req["sl"] = float(stop_loss)
+        if take_profit is not None:
+            req["tp"] = float(take_profit)
+
+        result = mt5.order_send(req)
+        retcode = getattr(result, "retcode", -1)
+        res = {
+            "retcode": retcode,
+            "deal": getattr(result, "deal", 0),
+            "order": getattr(result, "order", 0),
+            "price": getattr(result, "price", price),
+            "volume": getattr(result, "volume", volume),
+            "comment": getattr(result, "comment", ""),
+            "request_id": getattr(result, "request_id", 0),
+        }
+        log_transaction(action, {"type": "market", "symbol": resolved, "volume": volume, "side": side, "entry": price, "stop_loss": stop_loss, "take_profit": take_profit, "deviation": deviation, "magic": magic, "comment": comment}, res)
+        if retcode != 10009:
+            return {"ok": False, "error": "order_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+        return {"ok": True, "action": "market", "symbol": resolved, "volume": volume, "side": side, "entry": res["price"], "stop_loss": stop_loss, "take_profit": take_profit, "deal": res["deal"], "order": res["order"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+    if order_type == "Limit":
+        if entry is None:
+            return {"ok": False, "error": "missing_entry", "detail": "Limit orders require an entry price"}
+        ok, msg = validate_margin(symbol, volume, entry)
+        if not ok:
+            return {"ok": False, "error": "margin_check_failed", "detail": msg}
+        ok, msg = validate_price_levels(symbol, entry, stop_loss, take_profit, side)
+        if not ok:
+            return {"ok": False, "error": "price_validation_failed", "detail": msg}
+
+        mt5_side = mt5.ORDER_TYPE_BUY_LIMIT if side == "Long" else mt5.ORDER_TYPE_SELL_LIMIT
+        req = {
+            "action": mt5.TRADE_ACTION_PENDING,
+            "symbol": resolved,
+            "volume": volume,
+            "type": mt5_side,
+            "price": float(entry),
+            "deviation": deviation,
+            "magic": magic,
+            "comment": comment,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        if stop_loss is not None:
+            req["sl"] = float(stop_loss)
+        if take_profit is not None:
+            req["tp"] = float(take_profit)
+
+        result = mt5.order_send(req)
+        retcode = getattr(result, "retcode", -1)
+        res = {"retcode": retcode, "order": getattr(result, "order", 0), "comment": getattr(result, "comment", "")}
+        log_transaction(action, {"type": "limit", "symbol": resolved, "volume": volume, "side": side, "entry": entry, "stop_loss": stop_loss, "take_profit": take_profit, "deviation": deviation, "magic": magic, "comment": comment}, res)
+        if retcode != 10009:
+            return {"ok": False, "error": "order_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+        return {"ok": True, "action": "limit", "symbol": resolved, "volume": volume, "side": side, "entry": float(entry), "stop_loss": stop_loss, "take_profit": take_profit, "order": res["order"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+    if order_type == "Stop":
+        if entry is None and stop_price is None:
+            return {"ok": False, "error": "missing_entry", "detail": "Stop orders require an entry/stop price"}
+        trigger_price = float(entry or stop_price)
+        ok, msg = validate_margin(symbol, volume, trigger_price)
+        if not ok:
+            return {"ok": False, "error": "margin_check_failed", "detail": msg}
+        ok, msg = validate_price_levels(symbol, trigger_price, stop_loss, take_profit, side)
+        if not ok:
+            return {"ok": False, "error": "price_validation_failed", "detail": msg}
+
+        mt5_side = mt5.ORDER_TYPE_BUY_STOP if side == "Long" else mt5.ORDER_TYPE_SELL_STOP
+        req = {
+            "action": mt5.TRADE_ACTION_PENDING,
+            "symbol": resolved,
+            "volume": volume,
+            "type": mt5_side,
+            "price": trigger_price,
+            "deviation": deviation,
+            "magic": magic,
+            "comment": comment,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        if stop_loss is not None:
+            req["sl"] = float(stop_loss)
+        if take_profit is not None:
+            req["tp"] = float(take_profit)
+
+        result = mt5.order_send(req)
+        retcode = getattr(result, "retcode", -1)
+        res = {"retcode": retcode, "order": getattr(result, "order", 0), "comment": getattr(result, "comment", "")}
+        log_transaction(action, {"type": "stop", "symbol": resolved, "volume": volume, "side": side, "entry": trigger_price, "stop_loss": stop_loss, "take_profit": take_profit, "deviation": deviation, "magic": magic, "comment": comment}, res)
+        if retcode != 10009:
+            return {"ok": False, "error": "order_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+        return {"ok": True, "action": "stop", "symbol": resolved, "volume": volume, "side": side, "entry": trigger_price, "stop_loss": stop_loss, "take_profit": take_profit, "order": res["order"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+    if order_type == "StopLimit":
+        if entry is None and stop_price is None:
+            return {"ok": False, "error": "missing_entry", "detail": "Stop-limit orders require entry and stop price"}
+        trigger_price = float(stop_price or entry)
+        limit_price = float(entry or stop_price)
+        ok, msg = validate_margin(symbol, volume, limit_price)
+        if not ok:
+            return {"ok": False, "error": "margin_check_failed", "detail": msg}
+        ok, msg = validate_price_levels(symbol, limit_price, stop_loss, take_profit, side)
+        if not ok:
+            return {"ok": False, "error": "price_validation_failed", "detail": msg}
+
+        mt5_side = mt5.ORDER_TYPE_BUY_STOP_LIMIT if side == "Long" else mt5.ORDER_TYPE_SELL_STOP_LIMIT
+        req = {
+            "action": mt5.TRADE_ACTION_PENDING,
+            "symbol": resolved,
+            "volume": volume,
+            "type": mt5_side,
+            "price": limit_price,
+            "stoplimit": trigger_price,
+            "deviation": deviation,
+            "magic": magic,
+            "comment": comment,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        if stop_loss is not None:
+            req["sl"] = float(stop_loss)
+        if take_profit is not None:
+            req["tp"] = float(take_profit)
+
+        result = mt5.order_send(req)
+        retcode = getattr(result, "retcode", -1)
+        res = {"retcode": retcode, "order": getattr(result, "order", 0), "comment": getattr(result, "comment", "")}
+        log_transaction(action, {"type": "stop-limit", "symbol": resolved, "volume": volume, "side": side, "entry": limit_price, "stoplimit": trigger_price, "stop_loss": stop_loss, "take_profit": take_profit, "deviation": deviation, "magic": magic, "comment": comment}, res)
+        if retcode != 10009:
+            return {"ok": False, "error": "order_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+        return {"ok": True, "action": "stop-limit", "symbol": resolved, "volume": volume, "side": side, "entry": limit_price, "stoplimit": trigger_price, "stop_loss": stop_loss, "take_profit": take_profit, "order": res["order"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+    return {"ok": False, "error": "invalid_order_type", "detail": f"Unsupported order type: {order_type}"}
+
+
+def build_bracket_order(body):
+    symbol = body.get("symbol", "")
+    volume = float(body.get("volume", 0))
+    side = body.get("side", "")
+    entry = body.get("entry")
+    stop_loss = body.get("stopLoss")
+    take_profit = body.get("takeProfit")
+    deviation = int(body.get("deviation", 10))
+    magic = int(body.get("magic", 0))
+    comment = body.get("comment", "")
+
+    resolved = resolve_symbol(symbol)
+    if not resolved:
+        return {"ok": False, "error": "symbol_unresolved", "detail": f"Cannot resolve symbol '{symbol}'"}
+    symbol_info = get_symbol_info(symbol)
+    if not symbol_info:
+        return {"ok": False, "error": "symbol_not_found", "detail": f"Symbol '{resolved}' not found in MT5"}
+    if volume <= 0:
+        return {"ok": False, "error": "invalid_volume", "detail": "Volume must be positive"}
+    if side not in ("Long", "Short"):
+        return {"ok": False, "error": "invalid_side", "detail": "Side must be 'Long' or 'Short'"}
+    if entry is None:
+        return {"ok": False, "error": "missing_entry", "detail": "Bracket orders require an entry price"}
+    ok, msg = validate_margin(symbol, volume, float(entry))
+    if not ok:
+        return {"ok": False, "error": "margin_check_failed", "detail": msg}
+    ok, msg = validate_price_levels(symbol, float(entry), stop_loss, take_profit, side)
+    if not ok:
+        return {"ok": False, "error": "price_validation_failed", "detail": msg}
+
+    mt5_side = mt5.ORDER_TYPE_BUY if side == "Long" else mt5.ORDER_TYPE_SELL
+    req = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": resolved,
+        "volume": volume,
+        "type": mt5_side,
+        "price": float(entry),
+        "deviation": deviation,
+        "magic": magic,
+        "comment": comment,
+        "type_time": mt5.ORDER_TIME_GTC,
+    }
+    if stop_loss is not None:
+        req["sl"] = float(stop_loss)
+    if take_profit is not None:
+        req["tp"] = float(take_profit)
+
+    result = mt5.order_send(req)
+    retcode = getattr(result, "retcode", -1)
+    res = {"retcode": retcode, "deal": getattr(result, "deal", 0), "order": getattr(result, "order", 0), "price": getattr(result, "price", entry), "volume": getattr(result, "volume", volume), "comment": getattr(result, "comment", "")}
+    log_transaction("bracket", {"symbol": resolved, "volume": volume, "side": side, "entry": entry, "stop_loss": stop_loss, "take_profit": take_profit, "deviation": deviation, "magic": magic, "comment": comment}, res)
+    if retcode != 10009:
+        return {"ok": False, "error": "order_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+    return {"ok": True, "action": "bracket", "symbol": resolved, "volume": volume, "side": side, "entry": res["price"], "stop_loss": stop_loss, "take_profit": take_profit, "deal": res["deal"], "order": res["order"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+
+def build_modify_request(body):
+    ticket = body.get("ticket")
+    symbol = body.get("symbol", "")
+    stop_loss = body.get("stopLoss")
+    take_profit = body.get("takeProfit")
+    magic = int(body.get("magic", 0))
+    comment = body.get("comment", "")
+
+    if not ticket and not symbol:
+        return {"ok": False, "error": "missing_identifier", "detail": "Provide ticket or symbol to identify position"}
+
+    resolved = resolve_symbol(symbol) if symbol else symbol
+    if ticket:
+        positions = mt5.positions_get(ticket=int(ticket)) or []
+        if not positions:
+            return {"ok": False, "error": "position_not_found", "detail": f"Position {ticket} not found"}
+        target = positions[0]
+        resolved = resolved or target.symbol
+    else:
+        positions = mt5.positions_get(symbol=resolved) if resolved else mt5.positions_get() or []
+        if not positions:
+            return {"ok": False, "error": "position_not_found", "detail": f"No open positions for {resolved}"}
+        target = positions[0]
+
+    req = {
+        "action": mt5.TRADE_ACTION_SLTP,
+        "symbol": target.symbol,
+        "position": target.ticket,
+        "magic": magic,
+        "comment": comment,
+    }
+    if stop_loss is not None:
+        req["sl"] = float(stop_loss)
+    if take_profit is not None:
+        req["tp"] = float(take_profit)
+
+    result = mt5.order_send(req)
+    retcode = getattr(result, "retcode", -1)
+    res = {"retcode": retcode, "order": getattr(result, "order", 0), "comment": getattr(result, "comment", "")}
+    log_transaction("modify", {"ticket": target.ticket, "symbol": target.symbol, "stop_loss": stop_loss, "take_profit": take_profit, "magic": magic, "comment": comment}, res)
+    if retcode != 10009:
+        return {"ok": False, "error": "modify_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+    return {"ok": True, "action": "modify", "ticket": target.ticket, "symbol": target.symbol, "stop_loss": stop_loss, "take_profit": take_profit, "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+
+def build_close_request(body):
+    ticket = body.get("ticket")
+    symbol = body.get("symbol", "")
+    volume = body.get("volume")
+
+    if not ticket and not symbol:
+        return {"ok": False, "error": "missing_identifier", "detail": "Provide ticket or symbol to close position"}
+
+    resolved = resolve_symbol(symbol) if symbol else symbol
+    if ticket:
+        positions = mt5.positions_get(ticket=int(ticket)) or []
+        if not positions:
+            return {"ok": False, "error": "position_not_found", "detail": f"Position {ticket} not found"}
+        target = positions[0]
+    else:
+        positions = mt5.positions_get(symbol=resolved) if resolved else mt5.positions_get() or []
+        if not positions:
+            return {"ok": False, "error": "position_not_found", "detail": f"No open positions for {resolved}"}
+        target = positions[0]
+
+    close_volume = float(volume) if volume is not None else target.volume
+    close_volume = min(close_volume, target.volume)
+    mt5_side = mt5.ORDER_TYPE_SELL if target.type == 0 else mt5.ORDER_TYPE_BUY
+    tick = mt5.symbol_info_tick(target.symbol)
+    price = tick.bid if target.type == 0 else tick.ask
+
+    req = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": target.symbol,
+        "volume": close_volume,
+        "type": mt5_side,
+        "position": target.ticket,
+        "price": price,
+        "deviation": 10,
+        "type_time": mt5.ORDER_TIME_GTC,
+    }
+
+    result = mt5.order_send(req)
+    retcode = getattr(result, "retcode", -1)
+    res = {"retcode": retcode, "deal": getattr(result, "deal", 0), "volume": getattr(result, "volume", close_volume), "price": getattr(result, "price", price), "comment": getattr(result, "comment", "")}
+    log_transaction("close", {"ticket": target.ticket, "symbol": target.symbol, "volume": close_volume, "price": price}, res)
+    if retcode != 10009:
+        return {"ok": False, "error": "close_failed", "retcode": retcode, "detail": translate_mt5_error(retcode), "result": res}
+    return {"ok": True, "action": "close", "ticket": target.ticket, "symbol": target.symbol, "volume": close_volume, "price": res["price"], "deal": res["deal"], "retcode": retcode, "detail": translate_mt5_error(retcode)}
+
+
+def build_close_all_request():
+    positions = mt5.positions_get() or []
+    if not positions:
+        return {"ok": True, "action": "close-all", "closed": 0, "results": [], "detail": "No open positions"}
+    results = []
+    for p in positions:
+        mt5_side = mt5.ORDER_TYPE_SELL if p.type == 0 else mt5.ORDER_TYPE_BUY
+        tick = mt5.symbol_info_tick(p.symbol)
+        price = tick.bid if p.type == 0 else tick.ask
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": p.symbol,
+            "volume": p.volume,
+            "type": mt5_side,
+            "position": p.ticket,
+            "price": price,
+            "deviation": 10,
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        result = mt5.order_send(req)
+        retcode = getattr(result, "retcode", -1)
+        res = {"ticket": p.ticket, "symbol": p.symbol, "retcode": retcode, "deal": getattr(result, "deal", 0), "price": getattr(result, "price", price), "detail": translate_mt5_error(retcode)}
+        results.append(res)
+        log_transaction("close-all", {"ticket": p.ticket, "symbol": p.symbol, "volume": p.volume, "price": price}, res)
+    return {"ok": True, "action": "close-all", "closed": len(results), "results": results, "detail": f"Closed {len(results)} position(s)"}
+
+
+def order_history(from_time=None, to_time=None):
+    if not ensure_init():
+        return {"ok": False, "error": "mt5_initialize_failed"}
+    from_ts = from_time or (time.time() - 86400 * 30)
+    to_ts = to_time or time.time()
+    deals = mt5.history_deals_get(from_ts, to_ts) or []
+    out = []
+    for d in deals:
+        out.append({
+            "ticket": d.ticket,
+            "order": d.order,
+            "symbol": d.symbol,
+            "type": "Buy" if d.type == 0 else "Sell" if d.type == 1 else ("BuyLimit" if d.type == 2 else ("SellLimit" if d.type == 3 else ("BuyStop" if d.type == 4 else "SellStop"))),
+            "volume": d.volume,
+            "price": d.price,
+            "profit": d.profit,
+            "commission": d.commission,
+            "swap": d.swap,
+            "fee": d.fee,
+            "time": d.time,
+            "magic": d.magic,
+            "comment": d.comment,
+        })
+    return {"ok": True, "history": out, "count": len(out)}
+
+
+def transaction_history():
+    with TRANSACTION_LOG_LOCK:
+        return {"ok": True, "transactions": list(TRANSACTION_LOG), "count": len(TRANSACTION_LOG)}
+
+
 def health():
     initialized = ensure_init()
     acct = mt5.account_info() if initialized else None
@@ -206,7 +818,98 @@ def health():
             "symbols": STATE["resolved"]}
 
 
-# ── Futures contract pipeline ────────────────────────────────────────────────
+# ── HTTP server ──────────────────────────────────────────────────────────────
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        q = parse_qs(parsed.query)
+        if parsed.path == "/quotes":
+            body = quotes()
+        elif parsed.path == "/bars":
+            body = bars(q.get("s", ["NQ"])[0], q.get("tf", ["M5"])[0], q.get("count", ["180"])[0])
+        elif parsed.path == "/account":
+            body = account()
+        elif parsed.path == "/positions":
+            body = positions()
+        elif parsed.path == "/health":
+            body = health()
+        elif parsed.path == "/futures/chain":
+            body = futures_chain(q.get("s", ["NQ"])[0])
+        elif parsed.path == "/futures/continuous":
+            body = futures_continuous(q.get("s", ["NQ"])[0], q.get("tf", ["M5"])[0], q.get("count", ["180"])[0])
+        elif parsed.path == "/futures/spec":
+            body = futures_spec(q.get("s", ["NQ"])[0])
+        elif parsed.path == "/orders/history":
+            from_t = q.get("from", [None])[0]
+            to_t = q.get("to", [None])[0]
+            body = order_history(float(from_t) if from_t else None, float(to_t) if to_t else None)
+        elif parsed.path == "/orders/transactions":
+            body = transaction_history()
+        else:
+            body = {"ok": False, "error": "not_found"}
+        data = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        length = int(self.headers.get("Content-Length", 0))
+        body_raw = self.rfile.read(length) if length else b"{}"
+        try:
+            body = json.loads(body_raw)
+        except Exception:
+            body = {}
+
+        if parsed.path == "/orders/market":
+            response = build_order_request("market", body)
+        elif parsed.path == "/orders/limit":
+            response = build_order_request("limit", body)
+        elif parsed.path == "/orders/stop":
+            response = build_order_request("stop", body)
+        elif parsed.path == "/orders/stop-limit":
+            response = build_order_request("stop-limit", body)
+        elif parsed.path == "/orders/bracket":
+            response = build_bracket_order(body)
+        elif parsed.path == "/orders/modify":
+            response = build_modify_request(body)
+        elif parsed.path == "/orders/close":
+            response = build_close_request(body)
+        elif parsed.path == "/orders/close-all":
+            response = build_close_all_request()
+        else:
+            response = {"ok": False, "error": "not_found"}
+        data = json.dumps(response).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+
+if __name__ == "__main__":
+    ensure_init()
+    print("Dwella MT5 bridge on 127.0.0.1:%d, mt5=%s" % (PORT, STATE["initialized"]))
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
 
 def contract_expiration(underlying, year, month):
     """Expiration date for a futures contract.

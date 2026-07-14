@@ -137,6 +137,123 @@ function buffyApiHandler(req, res) {
         }
       }
 
+      // POST /buffy/orders/market — Place market order
+      if (pathname === "/buffy/orders/market" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/market", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/limit — Place limit order
+      if (pathname === "/buffy/orders/limit" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/limit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/stop — Place stop order
+      if (pathname === "/buffy/orders/stop" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/stop-limit — Place stop-limit order
+      if (pathname === "/buffy/orders/stop-limit" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/stop-limit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/bracket — Place bracket order
+      if (pathname === "/buffy/orders/bracket" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/bracket", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/modify — Modify position SL/TP
+      if (pathname === "/buffy/orders/modify" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/modify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/close — Close position
+      if (pathname === "/buffy/orders/close" && req.method === "POST") {
+        const b = await body();
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/close", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b), signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // POST /buffy/orders/close-all — Close all positions
+      if (pathname === "/buffy/orders/close-all" && req.method === "POST") {
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/close-all", { method: "POST", signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(r.status >= 400 ? 400 : 200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // GET /buffy/orders/history — Order history
+      if (pathname === "/buffy/orders/history" && req.method === "GET") {
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/history", { signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
+      // GET /buffy/orders/transactions — Transaction log
+      if (pathname === "/buffy/orders/transactions" && req.method === "GET") {
+        try {
+          const r = await fetch("http://127.0.0.1:8643/orders/transactions", { signal: AbortSignal.timeout(10000) });
+          const data = await r.json();
+          return json(200, data);
+        } catch {
+          return json(503, { ok: false, message: "MT5 bridge unavailable" });
+        }
+      }
+
       // GET /buffy/status — System + Buffy connection status
       if (pathname === "/buffy/status" && req.method === "GET") {
         const { hermesInstalled, hermesRunning, hermesApiHealthy, platform, version } = await getStatus();
@@ -337,6 +454,25 @@ ipcMain.handle("markets:quotes",async()=>{
   const yahoo=await yahooQuotes();
   return QUOTE_SYMBOLS.map(({s})=>live?.find(q=>q.s===s)||yahoo.find(q=>q.s===s)||{s,ok:false});
 });
+
+async function orderProxy(pathname, method, data){
+  try{
+    const r=await fetch(`${MT5_BRIDGE}${pathname}`,{method,headers:{"Content-Type":"application/json"},body:method!=="GET"?JSON.stringify(data):undefined,signal:AbortSignal.timeout(8000)});
+    if(!r.ok)return {ok:false,error:"bridge_error",status:r.status};
+    return await r.json();
+  }catch{return {ok:false,error:"bridge_unavailable"}}
+}
+
+ipcMain.handle("orders:market",async(_,data)=>await orderProxy("/orders/market","POST",data));
+ipcMain.handle("orders:limit",async(_,data)=>await orderProxy("/orders/limit","POST",data));
+ipcMain.handle("orders:stop",async(_,data)=>await orderProxy("/orders/stop","POST",data));
+ipcMain.handle("orders:stop-limit",async(_,data)=>await orderProxy("/orders/stop-limit","POST",data));
+ipcMain.handle("orders:bracket",async(_,data)=>await orderProxy("/orders/bracket","POST",data));
+ipcMain.handle("orders:modify",async(_,data)=>await orderProxy("/orders/modify","POST",data));
+ipcMain.handle("orders:close",async(_,data)=>await orderProxy("/orders/close","POST",data));
+ipcMain.handle("orders:close-all",async()=>await orderProxy("/orders/close-all","POST",{}));
+ipcMain.handle("orders:history",async()=>await orderProxy("/orders/history","GET"));
+ipcMain.handle("orders:transactions",async()=>await orderProxy("/orders/transactions","GET"));
 ipcMain.handle("window:minimize",()=>{if(win)win.minimize()});
 ipcMain.handle("window:toggle-maximize",()=>{if(!win)return;if(win.isMaximized())win.unmaximize();else win.maximize()});
 ipcMain.handle("window:close",()=>{if(win)win.close()});

@@ -163,6 +163,9 @@ export default function ReplayPanel() {
     if (type === "Market") {
       const { account: a } = placeMarketOrder(account, bar, side, qty, options);
       setAccount(a);
+    } else if (type === "StopLimit") {
+      const { account: a } = placePendingOrder(account, side, "Stop", qty, bar.close, options);
+      setAccount(a);
     } else {
       const { account: a } = placePendingOrder(account, side, type, qty, bar.close, options);
       setAccount(a);
