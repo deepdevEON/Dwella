@@ -1,5 +1,6 @@
 # Dwella MT5 bridge - runs inside the MetaTrader 5 Wine prefix on Windows Python.
 # Serves real-time broker quotes at http://127.0.0.1:8643 for the Dwella desktop app.
+import os
 import json
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -7,6 +8,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import MetaTrader5 as mt5
 
 PORT = 8643
+CREDENTIALS_PATH = os.environ.get("DWLLA_MT5_CREDENTIALS", "")
 # Logical dashboard symbols -> candidate MT5 symbol prefixes (CQG/AMP style first).
 CANDIDATES = {
     "NQ": ["@ENQ", "ENQ", "NQ", "MNQ", "USTEC", "NAS100"],
@@ -145,9 +147,68 @@ def health():
             "symbols": STATE["resolved"]}
 
 
+def do_login(login, password, server):
+    if not login or not password:
+        return {"ok": False, "error": "missing_credentials", "detail": "Login and password are required."}
+    try:
+        ok = mt5.initialize(login=int(login), password=password, server=server or "")
+    except Exception as exc:
+        return {"ok": False, "error": "initialize_exception", "detail": str(exc)}
+    if not ok:
+        err = mt5.last_error()
+        return {"ok": False, "error": "login_failed", "code": err[0], "detail": err[1]}
+    STATE["initialized"] = True
+    acct = mt5.account_info()
+    return {
+        "ok": True,
+        "login": acct.login if acct else int(login),
+        "server": getattr(acct, "server", server or ""),
+        "company": getattr(acct, "company", ""),
+        "balance": acct.balance if acct else 0,
+        "equity": acct.equity if acct else 0,
+    }
+
+
+def do_logout():
+    try:
+        mt5.shutdown()
+    except Exception:
+        pass
+    STATE["initialized"] = False
+    STATE["resolved"] = {}
+    STATE["resolved_at"] = 0
+    return {"ok": True}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        if not length:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}
+
+    def _cors(self, body):
+        data = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
@@ -165,13 +226,19 @@ class Handler(BaseHTTPRequestHandler):
             body = health()
         else:
             body = {"ok": False, "error": "not_found"}
-        data = json.dumps(body).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        self._cors(body)
+
+    def do_POST(self):
+        from urllib.parse import urlparse
+        parsed = urlparse(self.path)
+        data = self._read_body()
+        if parsed.path == "/login":
+            body = do_login(data.get("login"), data.get("password"), data.get("server"))
+        elif parsed.path == "/logout":
+            body = do_logout()
+        else:
+            body = {"ok": False, "error": "not_found"}
+        self._cors(body)
 
 
 if __name__ == "__main__":

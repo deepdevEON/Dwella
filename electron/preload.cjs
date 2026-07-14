@@ -15,6 +15,21 @@ contextBridge.exposeInMainWorld("dwella", {
   getPositions:()=>ipcRenderer.invoke("markets:positions"),
   openExternal:(url)=>ipcRenderer.invoke("shell:open",url),
 
+  mt5: {
+    testLogin: (profile:Mt5Profile)=>ipcRenderer.invoke("mt5:test-login",profile),
+    login: (profile:Mt5Profile)=>ipcRenderer.invoke("mt5:login",profile),
+    logout: ()=>ipcRenderer.invoke("mt5:logout"),
+    getProfiles: ()=>ipcRenderer.invoke("mt5:profiles","list"),
+    saveProfile: (profile:Mt5Profile)=>ipcRenderer.invoke("mt5:profiles","save",profile),
+    deleteProfile: (name:string)=>ipcRenderer.invoke("mt5:profiles","delete",{name}),
+    getStatus: ()=>ipcRenderer.invoke("mt5:status"),
+    onStatus: (cb:(status:Mt5Status)=>void)=>{
+      const listener=(_,status)=>cb(status);
+      ipcRenderer.on("mt5:status",listener);
+      return()=>ipcRenderer.off("mt5:status",listener);
+    },
+  },
+
   // ── Buffy IPC ────────────────────────────────────────────────────────
   buffy: {
     getHistory: () => ipcRenderer.invoke("buffy:history"),

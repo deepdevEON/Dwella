@@ -4,6 +4,17 @@ declare global {
   interface Window { dwella: {
     platform:string; windowControls:{minimize:()=>Promise<void>;toggleMaximize:()=>Promise<void>;close:()=>Promise<void>;isMaximized:()=>Promise<boolean>;onMaxChanged:(cb:(isMax:boolean)=>void)=>()=>void}; hasLocalLogin:()=>Promise<boolean>; createLocalLogin:(password:string)=>Promise<ActionResult>; verifyLocalLogin:(password:string)=>Promise<ActionResult>; clearLocalLogin:()=>Promise<ActionResult>; getSystemStatus:()=>Promise<SystemStatus>; startHermes:()=>Promise<ActionResult>; stopHermes:()=>Promise<ActionResult>; askHermes:(input:string)=>Promise<ActionResult>; openExternal:(url:string)=>Promise<void>; getMarketQuotes:()=>Promise<MarketQuote[]>; getMarketBars:(s:string,tf:string,count?:number)=>Promise<BarsResult>; getAccount:()=>Promise<AccountSummary>; getPositions:()=>Promise<PositionsResult>;
 
+    mt5: {
+      testLogin: (profile:Mt5Profile)=>Promise<ActionResult>;
+      login: (profile:Mt5Profile)=>Promise<ActionResult>;
+      logout: ()=>Promise<ActionResult>;
+      getProfiles: ()=>Promise<{ok:boolean;profiles:Mt5Profile[]}>;
+      saveProfile: (profile:Mt5Profile)=>Promise<{ok:boolean;profiles:Mt5Profile[]}>;
+      deleteProfile: (name:{name:string})=>Promise<{ok:boolean;profiles:Mt5Profile[]}>;
+      getStatus: ()=>Promise<Mt5Status>;
+      onStatus: (cb:(status:Mt5Status)=>void)=>()=>void;
+    };
+
     buffy: {
       getHistory: () => Promise<BuffyMessage[]>;
       getSignals: () => Promise<BuffySignal[]>;
@@ -19,6 +30,12 @@ declare global {
   interface AccountSummary { ok:boolean; balance?:number; equity?:number; profit?:number; marginFree?:number; currency?:string; leverage?:number; server?:string; company?:string; login?:number; }
   interface Mt5Position { symbol:string; side:string; volume:number; entry:number; current:number; profit:number; }
   interface PositionsResult { ok:boolean; positions?:Mt5Position[]; }
+
+  // ── MT5 Broker types ──────────────────────────────────────────────────
+  interface Mt5Profile { name:string; login:string; password:string; server:string; isDefault?:boolean; }
+  interface Mt5Status { ok?:boolean; connected?:boolean; broker?:string|null; server?:string|null; detail?:string; }
+
+  // ── End MT5 Broker types ──────────────────────────────────────────────
 
   // ── Buffy types ──────────────────────────────────────────────────────
   interface BuffyMessage {

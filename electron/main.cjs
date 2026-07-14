@@ -195,8 +195,17 @@ function createWindow(){
 app.whenReady().then(()=>{
   createWindow();
   startBuffyApi();
-  // Dwella is the skin: self-provision the MT5 engine (install if missing), run it hidden, start the bridge.
-  setTimeout(()=>mt5Quotes().then(live=>{if(!live)ensureBridge();else mt5setup.launchEngineHidden()}),3000);
+  const autoLogin=async()=>{
+    try{
+      const profile=await mt5setup.getDefaultProfile();
+      if(!profile)return;
+      const health=await bridgeJson("/health");
+      if(health?.connected)return;
+      const result=await bridgePost("/login",{login:String(profile.login),password:String(profile.password),server:String(profile.server||"")});
+      if(result?.ok)sendToRenderer("mt5:status",{connected:true,broker:result.company,server:result.server});
+    }catch{}
+  };
+  setTimeout(()=>mt5Quotes().then(live=>{if(!live){ensureBridge();autoLogin()}else{mt5setup.launchEngineHidden();sendToRenderer("mt5:status",{connected:true})}}),3000);
   app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)createWindow()});
 });
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});
@@ -225,6 +234,8 @@ const QUOTE_SYMBOLS=[{s:"NQ",y:"NQ=F"},{s:"GC",y:"GC=F"},{s:"ES",y:"ES=F"}];
 const MT5_BRIDGE="http://127.0.0.1:8643";
 const mt5setup=require("./mt5setup.cjs");
 let lastBridgeSpawn=0, provisioning=false;
+async function bridgePost(pathname, body){
+  try{const response=await fetch(`${MT5_BRIDGE}${pathname}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{}),signal:AbortSignal.timeout(15000)});if(!response.ok)return null;return await response.json()}catch{return null}}
 async function mt5Quotes(){
   try{const response=await fetch(`${MT5_BRIDGE}/quotes`,{signal:AbortSignal.timeout(5000)});if(!response.ok)return null;const body=await response.json();return body.ok&&Array.isArray(body.quotes)&&body.quotes.length?body.quotes:null}catch{return null}
 }
@@ -276,6 +287,36 @@ ipcMain.handle("markets:quotes",async()=>{
   if(!live)ensureBridge();
   const yahoo=await yahooQuotes();
   return QUOTE_SYMBOLS.map(({s})=>live?.find(q=>q.s===s)||yahoo.find(q=>q.s===s)||{s,ok:false});
+});
+
+ipcMain.handle("mt5:test-login",async(_,profile)=>{
+  if(!profile?.login||!profile?.password)return {ok:false,message:"Login and password are required."};
+  const result=await bridgePost("/login",{login:String(profile.login),password:String(profile.password),server:String(profile.server||"")});
+  if(!result)return {ok:false,message:"MT5 bridge is not running. Wait for provisioning or restart the app."};
+  if(result.ok)return {ok:true,message:"Login successful.",data:result};
+  return {ok:false,message:result.detail||`Login failed (code ${result.code||"unknown"}).`};
+});
+ipcMain.handle("mt5:login",async(_,profile)=>{
+  if(!profile?.login||!profile?.password)return {ok:false,message:"Login and password are required."};
+  const result=await bridgePost("/login",{login:String(profile.login),password:String(profile.password),server:String(profile.server||"")});
+  if(!result||!result.ok)return {ok:false,message:result?.detail||"MT5 bridge login failed."};
+  await mt5setup.saveMt5Profile({name:profile.name||`${profile.login}`,login:String(profile.login),password:String(profile.password),server:String(profile.server||""),isDefault:true});
+  return {ok:true,message:"Broker connected and credentials saved.",data:result};
+});
+ipcMain.handle("mt5:logout",async()=>{
+  const result=await bridgePost("/logout");
+  if(result?.ok)sendToRenderer("mt5:status",{connected:false});
+  return result||{ok:false,message:"Bridge unavailable."};
+});
+ipcMain.handle("mt5:profiles",async(_,action,payload)=>{
+  if(action==="list")return {ok:true,profiles:await mt5setup.getMt5Profiles()};
+  if(action==="save"){await mt5setup.saveMt5Profile(payload);return {ok:true,profiles:await mt5setup.getMt5Profiles()}}
+  if(action==="delete"){await mt5setup.deleteMt5Profile(payload.name);return {ok:true,profiles:await mt5setup.getMt5Profiles()}}
+  return {ok:false,message:"Unknown action."};
+});
+ipcMain.handle("mt5:status",async()=>{
+  const data=await bridgeJson("/health");
+  return data||{ok:false,connected:false};
 });
 ipcMain.handle("window:minimize",()=>{if(win)win.minimize()});
 ipcMain.handle("window:toggle-maximize",()=>{if(!win)return;if(win.isMaximized())win.unmaximize();else win.maximize()});
