@@ -9,7 +9,7 @@ import json
 import os
 import re
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import MetaTrader5 as mt5
@@ -29,11 +29,11 @@ CANDIDATES = {
 # increment, point_value is the USD value of a 1.0 price move, margin is an
 # indicative initial margin per contract (broker-dependent).
 FUTURES_META = {
-    "NQ":  {"name": "Nasdaq 100 E-mini", "exchange": "CME",   "tick_size": 0.25, "point_value": 20.0,  "contract_size": 20,  "margin": 1500, "decimals": 2,
+    "NQ":  {"name": "Nasdaq 100 E-mini", "exchange": "CME",   "tick_size": 0.25, "point_value": 20.0,  "contract_size": 20,  "micro_contract_size": 2,   "margin": 1500, "decimals": 2,
              "micro": "MNQ", "micro_point_value": 2.0,  "micro_tick_size": 0.25},
-    "ES":  {"name": "S&P 500 E-mini",     "exchange": "CME",   "tick_size": 0.25, "point_value": 50.0,  "contract_size": 50,  "margin": 1200, "decimals": 2,
+    "ES":  {"name": "S&P 500 E-mini",     "exchange": "CME",   "tick_size": 0.25, "point_value": 50.0,  "contract_size": 50,  "micro_contract_size": 5,   "margin": 1200, "decimals": 2,
              "micro": "MES", "micro_point_value": 5.0,  "micro_tick_size": 0.25},
-    "GC":  {"name": "Gold (COMEX)",       "exchange": "COMEX", "tick_size": 0.1,  "point_value": 100.0, "contract_size": 100, "margin": 1100, "decimals": 1,
+    "GC":  {"name": "Gold (COMEX)",       "exchange": "COMEX", "tick_size": 0.1,  "point_value": 100.0, "contract_size": 100, "micro_contract_size": 10,  "margin": 1100, "decimals": 1,
              "micro": "MGC", "micro_point_value": 10.0, "micro_tick_size": 0.1},
 }
 
@@ -278,7 +278,7 @@ def futures_chain(underlying):
             "point_value": pv,
             "tick_value": round((tick or 0) * (pv or 0), 4),
             "micro": is_micro,
-            "contract_size": meta.get("contract_size"),
+            "contract_size": meta.get("micro_contract_size") if is_micro else meta.get("contract_size"),
             "margin": meta.get("margin"),
             "exchange": meta.get("exchange"),
             "name": meta.get("name"),
@@ -343,18 +343,23 @@ def futures_continuous(underlying, tf, count):
 
     out = []
     if rolled and bars0 is not None and bars1 is not None and len(bars0) and len(bars1):
-        t0 = {b["time"] for b in bars0}
-        t1 = {b["time"] for b in bars1}
-        overlap = sorted(t0 & t1)
-        if overlap:
-            roll_ts = overlap[-1]
-            c0_close = next(b["close"] for b in bars0 if b["time"] == roll_ts)
-            c1_close = next(b["close"] for b in bars1 if b["time"] == roll_ts)
+        # Build a real roll stitch at the roll boundary. Because the front (c0) and
+        # next (c1) contracts trade concurrently, aligning at the latest overlapping
+        # timestamp (~now) would leave c1 contributing zero bars. Instead we stitch at
+        # the first bar on/after the roll date, so c1 genuinely supplies the post-roll
+        # portion and the reported symbol matches the bars actually contributed.
+        m0 = {b["time"]: _bar_obj(b) for b in bars0}
+        m1 = {b["time"]: _bar_obj(b) for b in bars1}
+        roll_epoch = int(datetime(roll_date.year, roll_date.month, roll_date.day).timestamp())
+        stitch_cands = sorted(set(m0) & set(m1))
+        stitch_cands = [t for t in stitch_cands if t >= roll_epoch]
+        if stitch_cands:
+            roll_ts = stitch_cands[0]
+            c0_close = m0[roll_ts]["c"]
+            c1_close = m1[roll_ts]["c"]
             diff = float(c0_close - c1_close)
-            m0 = {b["time"]: _bar_obj(b) for b in bars0}
-            m1 = {b["time"]: _bar_obj(b) for b in bars1}
             for t in sorted(set(m0) | set(m1)):
-                if t <= roll_ts:
+                if t < roll_ts:
                     if t in m0:
                         out.append(m0[t])
                 else:
