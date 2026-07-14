@@ -7,3 +7,6 @@ release/
 *.log
 __pycache__/
 *.pyc
+
+# TypeScript incremental build info
+*.tsbuildinfo
