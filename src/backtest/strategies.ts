@@ -6,6 +6,11 @@
 
 import type { Bar } from "../replay-engine";
 import type { Strategy, BarContext } from "./engine";
+import { GCTrendStrategy } from "../strategies/gc-trend/strategy";
+import { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
+
+export { GCTrendStrategy } from "../strategies/gc-trend/strategy";
+export { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
 
 export function sma(bars: Bar[], period: number, endIndex: number): number | null {
   if (endIndex + 1 < period) return null;
@@ -171,7 +176,7 @@ const mtfMomentum: Strategy = {
   },
 };
 
-export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum];
+export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum, GCTrendStrategy, GCBreakoutStrategy];
 
 export function getStrategy(id: string): Strategy | undefined {
   return BUILTIN_STRATEGIES.find(s => s.id === id);
