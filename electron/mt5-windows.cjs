@@ -3,7 +3,6 @@ const { promisify } = require("node:util");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const http = require("node:http");
 const execFileAsync = promisify(execFile);
 
 const MT5_INSTALL_PATHS = [
@@ -17,10 +16,6 @@ const CACHE = path.join(os.homedir(), ".dwella-desktop", "mt5-cache");
 const BRIDGE_DIR = path.join(os.homedir(), ".dwella-desktop", "mt5-bridge");
 
 const exists = (p) => fs.access(p).then(() => true, () => false);
-
-function winePath(p) {
-  return "Z:" + p.replace(/\\/g, "/");
-}
 
 async function download(url, dest) {
   const response = await fetch(url, { signal: AbortSignal.timeout(300000) });
@@ -39,35 +34,18 @@ async function findMt5Installation() {
   return null;
 }
 
-async function detectWine() {
-  const candidates = ["wine", "wine64"];
-  for (const candidate of candidates) {
-    try {
-      await execFileAsync(candidate, ["--version"]);
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
 async function installSilently(log) {
   log("Downloading MetaTrader 5 installer\u2026");
   const installer = path.join(CACHE, "mt5-setup.exe");
   await download(MT5_SETUP_URL, installer);
 
-  const wine = await detectWine();
-  if (!wine) throw new Error("Wine is not installed. Install Wine to run MT5 on this platform.");
-
-  log("Installing MetaTrader 5 via Wine (silent mode)\u2026");
-  const env = {
-    ...process.env,
-    WINEPREFIX: path.join(os.homedir(), ".wine"),
-    WINEDEBUG: "-all",
-  };
-
-  await execFileAsync(wine, [installer, "/S"], { env, timeout: 600000 });
+  log("Installing MetaTrader 5 (native, silent)\u2026");
+  try {
+    await execFileAsync(installer, ["/S"], { windowsHide: true, timeout: 600000 });
+  } catch (err) {
+    if (!/exit code|status/i.test(String(err.message)) && err.code === "ENOENT") throw err;
+    log("Silent install returned a non-zero exit code; continuing verification\u2026");
+  }
 }
 
 async function ensureMt5Installed(log = () => {}) {
@@ -87,21 +65,23 @@ async function launchEngineHidden() {
   const exe = path.join(installPath, MT5_EXE);
   if (!await exists(exe)) throw new Error(`MT5 executable not found: ${exe}`);
 
-  const wine = await detectWine();
-  if (!wine) throw new Error("Wine is not installed");
-
-  const env = {
-    ...process.env,
-    WINEPREFIX: path.join(os.homedir(), ".wine"),
-    WINEDEBUG: "-all",
-  };
-
-  spawn(wine, [exe], {
-    env,
+  spawn(exe, [], {
+    windowsHide: true,
     detached: true,
     stdio: "ignore",
-    windowsHide: true,
   }).unref();
+}
+
+async function findPython() {
+  for (const candidate of ["python", "python3", "py"]) {
+    try {
+      await execFileAsync(candidate, ["--version"]);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 async function deployBridge(log) {
@@ -115,23 +95,18 @@ async function deployBridge(log) {
   }
 }
 
-async function startBridge() {
-  await deployBridge(() => {});
-  const wine = await detectWine();
-  if (!wine) return false;
+async function startBridge(log = () => {}) {
+  await deployBridge(log);
+  const python = await findPython();
+  if (!python) {
+    log("Python not found; bridge not started. Install Python to enable live data.");
+    return false;
+  }
 
-  const exe = path.join(BRIDGE_DIR, "python", "python.exe");
-  const env = {
-    ...process.env,
-    WINEPREFIX: path.join(os.homedir(), ".wine"),
-    WINEDEBUG: "-all",
-  };
-
-  const child = spawn(wine, [exe, path.join(BRIDGE_DIR, "dwella_bridge.py")], {
-    env,
+  const child = spawn(python, [path.join(BRIDGE_DIR, "dwella_bridge.py")], {
+    windowsHide: true,
     detached: true,
     stdio: "ignore",
-    windowsHide: true,
   });
   child.unref();
 
@@ -148,7 +123,7 @@ async function startBridge() {
 async function provision(log = () => {}) {
   await ensureMt5Installed(log);
   await launchEngineHidden();
-  return startBridge();
+  return startBridge(log);
 }
 
-module.exports = { provision, startBridge, launchEngineHidden, ensureMt5Installed };
+module.exports = { provision, startBridge, launchEngineHidden, ensureMt5Installed, findMt5Installation };
