@@ -48,6 +48,16 @@ if (!window.dwella) {
     getPositions: async () => {
       try { return await (await fetch("http://127.0.0.1:8643/positions")).json(); } catch { return { ok: false }; }
     },
+    mt5: {
+      testLogin: async () => ({ ok: true, message: "Preview mode." }),
+      login: async () => ({ ok: true, message: "Preview mode." }),
+      logout: async () => ({ ok: true, message: "Preview mode." }),
+      getProfiles: async () => ({ ok: true, profiles: [] }),
+      saveProfile: async () => ({ ok: true, profiles: [] }),
+      deleteProfile: async () => ({ ok: true, profiles: [] }),
+      getStatus: async () => ({ ok: true, connected: false }),
+      onStatus: () => () => {},
+    },
     buffy: {
       getHistory: async () => { try { const r=await fetch("http://127.0.0.1:8645/buffy/messages"); const b=await r.json(); return b.messages||[]; } catch { return []; } },
       getSignals: async () => { try { const r=await fetch("http://127.0.0.1:8645/buffy/signals"); const b=await r.json(); return b.signals||[]; } catch { return []; } },
