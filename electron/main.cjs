@@ -222,6 +222,14 @@ ipcMain.handle("hermes:ask",async(_,input)=>{
 });
 
 const QUOTE_SYMBOLS=[{s:"NQ",y:"NQ=F"},{s:"GC",y:"GC=F"},{s:"ES",y:"ES=F"}];
+const FUTURES_SPECS={
+  NQ:{name:"Nasdaq 100 E-mini",exchange:"CME",tick_size:0.25,point_value:20,micro:"MNQ",micro_point_value:2,continuous:["NQ#","NQ.US","NQ.CONT","@ENQ","ENQ"]},
+  ES:{name:"S&P 500 E-mini",exchange:"CME",tick_size:0.25,point_value:50,micro:"MES",micro_point_value:5,continuous:["ES#","ES.US","ES.CONT","@EP","@ES","EP"]},
+  GC:{name:"Gold (COMEX)",exchange:"COMEX",tick_size:0.1,point_value:100,micro:"MGC",micro_point_value:10,continuous:["GC#","GC.US","GC.CONT","@GCE","GCE"]},
+};
+const FUTURES_ROOTS=Object.keys(FUTURES_SPECS);
+// Brokers we attempt to resolve futures symbols across (used for diagnostics/logging).
+const FUTURES_BROKERS=["CQG","AMP","FXCM","Rithmic"];
 const MT5_BRIDGE="http://127.0.0.1:8643";
 const mt5setup=require("./mt5setup.cjs");
 let lastBridgeSpawn=0, provisioning=false;
@@ -248,7 +256,7 @@ async function yahooQuotes(){
   }));
 }
 async function bridgeJson(pathname){try{const response=await fetch(`${MT5_BRIDGE}${pathname}`,{signal:AbortSignal.timeout(8000)});if(!response.ok)return null;return await response.json()}catch{return null}}
-const YAHOO_TF={M1:{interval:"1m",range:"1d"},M5:{interval:"5m",range:"5d"},M15:{interval:"15m",range:"5d"},H1:{interval:"60m",range:"1mo"},D1:{interval:"1d",range:"6mo"}};
+const YAHOO_TF={M1:{interval:"1m",range:"1d"},M5:{interval:"5m",range:"5d"},M15:{interval:"15m",range:"5d"},M30:{interval:"30m",range:"1mo"},H1:{interval:"60m",range:"1mo"},H4:{interval:"60m",range:"3mo"},D1:{interval:"1d",range:"6mo"}};
 async function yahooBars(s,tf,count){
   const symbol=QUOTE_SYMBOLS.find(q=>q.s===s)?.y; const cfg=YAHOO_TF[tf]||YAHOO_TF.M5;
   if(!symbol)return null;
@@ -261,12 +269,64 @@ async function yahooBars(s,tf,count){
     const bars=[];
     for(let i=0;i<ts.length;i++){const o=q.open?.[i],h=q.high?.[i],l=q.low?.[i],c=q.close?.[i];if([o,h,l,c].every(v=>typeof v==="number"))bars.push({t:ts[i]*1000,o,h,l,c,v:q.volume?.[i]||0})}
     return bars.length?{ok:true,symbol,tf,src:"yahoo",bars:bars.slice(-(count||180))}:null;
-  }catch{return null}
+   }catch{return null}
+}
+
+// ── Futures fallback (when MT5 bridge is offline) ────────────────────────────
+const MONTH_CODES={F:1,G:2,H:3,J:4,K:5,M:6,N:7,Q:8,U:9,V:10,X:11,Z:12};
+const CODE_FOR_MONTH=Object.fromEntries(Object.entries(MONTH_CODES).map(([k,v])=>[v,k]));
+function thirdFriday(year,month){const first=new Date(Date.UTC(year,month-1,1));const offset=(5-first.getUTCDay()+7)%7;const d=new Date(first);d.setUTCDate(1+offset+7*2);return d;}
+function thirdLastBusinessDay(year,month){const nxt=month===12?new Date(Date.UTC(year+1,0,1)):new Date(Date.UTC(year,month,1));const d=new Date(nxt);d.setUTCDate(d.getUTCDate()-1);let seen=0;while(seen<3){if(d.getUTCDay()<5)seen++;d.setUTCDate(d.getUTCDate()-1);}d.setUTCDate(d.getUTCDate()+1);return d;}
+function contractExpiration(underlying,year,month){const metal=(underlying==="GC"||underlying==="MGC");return (metal?thirdLastBusinessDay:thirdFriday)(year,month).toISOString().slice(0,10);}
+function buildStaticChain(underlying){
+  const spec=FUTURES_SPECS[underlying];
+  if(!spec)return {ok:false,error:"unknown_underlying",underlying};
+  const now=new Date();let y=now.getUTCFullYear(),m=now.getUTCMonth()+1;
+  const contracts=[];
+  for(let i=0;i<8;i++){
+    const code=CODE_FOR_MONTH[m];
+    const yy=String(y).slice(2);
+    for(const root of [underlying,spec.micro]){
+      const pv=root===spec.micro?spec.micro_point_value:spec.point_value;
+      const tick=spec.tick_size;
+      contracts.push({symbol:`${root}${code}${yy}`,underlying,root,month:m,year:y,month_code:code,
+        expiration:contractExpiration(root,y,m),tick_size:tick,point_value:pv,tick_value:+(tick*pv).toFixed(4),
+        contract_size:pv,margin:spec.margin,exchange:spec.exchange,name:spec.name});
+    }
+    m++;if(m>12){m=1;y++;}
+  }
+  return {ok:true,underlying,continuous:spec.continuous,contracts,spec};
 }
 ipcMain.handle("markets:bars",async(_,s,tf,count)=>{
+  if(FUTURES_ROOTS.includes(s)){
+    const cont=await bridgeJson(`/futures/continuous?s=${encodeURIComponent(s)}&tf=${encodeURIComponent(tf)}&count=${encodeURIComponent(count||180)}`);
+    if(cont&&cont.ok&&Array.isArray(cont.bars)&&cont.bars.length)return {src:"mt5",...cont};
+  }
   const live=await bridgeJson(`/bars?s=${encodeURIComponent(s)}&tf=${encodeURIComponent(tf)}&count=${encodeURIComponent(count||180)}`);
   if(live&&live.ok&&Array.isArray(live.bars)&&live.bars.length)return {src:"mt5",...live};
   return await yahooBars(s,tf,count)||{ok:false};
+});
+// Futures roots (NQ/ES/GC) route through the rollover-aware continuous endpoint
+// when live, otherwise fall back to the underlying Yahoo continuous future.
+ipcMain.handle("markets:futures-bars",async(_,s,tf,count)=>{
+  if(FUTURES_ROOTS.includes(s)){
+    const live=await bridgeJson(`/futures/continuous?s=${encodeURIComponent(s)}&tf=${encodeURIComponent(tf)}&count=${encodeURIComponent(count||180)}`);
+    if(live&&live.ok&&Array.isArray(live.bars)&&live.bars.length)return {src:"mt5",...live};
+  }
+  return await yahooBars(s,tf,count)||{ok:false};
+});
+ipcMain.handle("markets:futures-chain",async(_,s)=>{
+  const live=await bridgeJson(`/futures/chain?s=${encodeURIComponent(s)}`);
+  if(live&&live.ok&&Array.isArray(live.contracts))return {src:"mt5",...live};
+  // Graceful fallback: synthesize the chain from static specs (no MT5 needed).
+  return {src:"static",...buildStaticChain(s)};
+});
+ipcMain.handle("markets:futures-spec",async(_,s)=>{
+  const live=await bridgeJson(`/futures/spec?s=${encodeURIComponent(s)}`);
+  if(live&&live.ok)return {src:"mt5",...live};
+  const spec=FUTURES_SPECS[s];
+  if(!spec)return {ok:false,error:"unknown_underlying",underlying:s};
+  return {ok:true,underlying:s,spec,continuous:spec.continuous};
 });
 ipcMain.handle("markets:account",async()=>await bridgeJson("/account")||{ok:false});
 ipcMain.handle("markets:positions",async()=>await bridgeJson("/positions")||{ok:false});

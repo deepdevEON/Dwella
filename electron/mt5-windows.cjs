@@ -84,6 +84,23 @@ async function findPython() {
   return null;
 }
 
+// Environment passed to the bridge when running against a NATIVE Windows MT5
+// install (i.e. outside the macOS Wine prefix). MT5_TERMINAL_PATH lets the
+// Python bridge initialise against the specific terminal build, and the login
+// block lets it attach to a live account if credentials are configured.
+function bridgeEnv(installPath) {
+  const env = { ...process.env };
+  if (installPath) {
+    env.MT5_TERMINAL_PATH = path.join(installPath, MT5_EXE);
+  }
+  if (process.env.DWELLA_MT5_LOGIN) {
+    env.MT5_LOGIN = process.env.DWELLA_MT5_LOGIN;
+    env.MT5_PASSWORD = process.env.DWELLA_MT5_PASSWORD || "";
+    env.MT5_SERVER = process.env.DWELLA_MT5_SERVER || "";
+  }
+  return env;
+}
+
 async function deployBridge(log) {
   await fs.mkdir(BRIDGE_DIR, { recursive: true });
   const src = path.join(__dirname, "dwella_bridge.py");
@@ -103,10 +120,13 @@ async function startBridge(log = () => {}) {
     return false;
   }
 
+  // Native Windows: bind the bridge to the installed terminal (no Wine prefix).
+  const installPath = await findMt5Installation();
   const child = spawn(python, [path.join(BRIDGE_DIR, "dwella_bridge.py")], {
     windowsHide: true,
     detached: true,
     stdio: "ignore",
+    env: bridgeEnv(installPath),
   });
   child.unref();
 
@@ -126,4 +146,4 @@ async function provision(log = () => {}) {
   return startBridge(log);
 }
 
-module.exports = { provision, startBridge, launchEngineHidden, ensureMt5Installed, findMt5Installation };
+module.exports = { provision, startBridge, launchEngineHidden, ensureMt5Installed, findMt5Installation, bridgeEnv, findPython };
