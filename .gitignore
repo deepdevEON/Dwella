@@ -1,0 +1,7 @@
+node_modules/
+dist/
+release/
+*.dmg
+*.zip
+.DS_Store
+*.log
