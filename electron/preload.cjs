@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("dwella", {
 
   getMarketQuotes:()=>ipcRenderer.invoke("markets:quotes"),
   getMarketBars:(s,tf,count)=>ipcRenderer.invoke("markets:bars",s,tf,count),
+  getFuturesBars:(s,tf,count)=>ipcRenderer.invoke("markets:futures-bars",s,tf,count),
+  getFuturesChain:(s)=>ipcRenderer.invoke("markets:futures-chain",s),
+  getFuturesSpec:(s)=>ipcRenderer.invoke("markets:futures-spec",s),
   getAccount:()=>ipcRenderer.invoke("markets:account"),
   getPositions:()=>ipcRenderer.invoke("markets:positions"),
   openExternal:(url)=>ipcRenderer.invoke("shell:open",url),
