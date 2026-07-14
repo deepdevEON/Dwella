@@ -48,6 +48,16 @@ if (!window.dwella) {
     getPositions: async () => {
       try { return await (await fetch("http://127.0.0.1:8643/positions")).json(); } catch { return { ok: false }; }
     },
+    placeMarketOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    placeLimitOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    placeStopOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    placeStopLimitOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    placeBracketOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    modifyOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    closeOrder: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    closeAllOrders: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    getOrderHistory: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
+    getTransactionLog: async () => ({ ok: false, error: "Preview mode — orders disabled." }),
     buffy: {
       getHistory: async () => { try { const r=await fetch("http://127.0.0.1:8645/buffy/messages"); const b=await r.json(); return b.messages||[]; } catch { return []; } },
       getSignals: async () => { try { const r=await fetch("http://127.0.0.1:8645/buffy/signals"); const b=await r.json(); return b.signals||[]; } catch { return []; } },

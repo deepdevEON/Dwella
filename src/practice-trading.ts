@@ -3,9 +3,10 @@
 import { Bar } from "./replay-engine";
 
 export type OrderSide = "Long" | "Short";
-export type OrderType = "Market" | "Limit" | "Stop";
+export type OrderType = "Market" | "Limit" | "Stop" | "StopLimit";
 export type OrderStatus = "Pending" | "Open" | "Closed" | "Cancelled";
 export type CloseReason = "manual" | "stop" | "take-profit" | "expired";
+export type TradingMode = "paper" | "live";
 
 export interface TradeOrder {
   id: string;
@@ -29,6 +30,11 @@ export interface TradeOrder {
   closedAt?: number;
   closedReason?: CloseReason;
   label?: string;
+  ticket?: number | string;
+  magic?: number;
+  comment?: string;
+  retcode?: number;
+  deal?: number | string;
 }
 
 export interface PracticeAccount {
@@ -255,4 +261,282 @@ export function checkPendingOrders(account: PracticeAccount, bar: Bar): Practice
 
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+export interface LiveAccountSnapshot {
+  balance: number;
+  equity: number;
+  openPositions: TradeOrder[];
+  closedTrades: TradeOrder[];
+  pendingOrders: TradeOrder[];
+  totalPnl: number;
+  winRate: number;
+  tradeCount: number;
+  mode: TradingMode;
+  marginFree?: number;
+  currency?: string;
+  leverage?: number;
+}
+
+function mapLivePosition(p: { symbol: string; side: string; volume: number; entry: number; current: number; profit: number }, index: number): TradeOrder {
+  return {
+    id: `live-${p.symbol}-${index}`,
+    symbol: p.symbol,
+    side: p.side as OrderSide,
+    type: "Market",
+    quantity: p.volume,
+    entryPrice: p.entry,
+    status: "Open",
+    openedAt: Math.floor(Date.now() / 1000),
+    label: "live",
+  };
+}
+
+export async function syncLivePositions(): Promise<LiveAccountSnapshot> {
+  const dw = window.dwella;
+  if (!dw) throw new Error("dwella bridge not available");
+  const [positionsRes, accountRes] = await Promise.all([dw.getPositions(), dw.getAccount()]);
+  const positions = positionsRes.ok && positionsRes.positions ? positionsRes.positions.map(mapLivePosition) : [];
+  const totalPnl = round2(positions.reduce((s, p) => s + ((p as TradeOrder & { profit?: number }).profit ?? 0), 0));
+  return {
+    balance: accountRes.ok ? (accountRes.balance ?? 0) : 0,
+    equity: accountRes.ok ? (accountRes.equity ?? 0) : 0,
+    openPositions: positions,
+    closedTrades: [],
+    pendingOrders: [],
+    totalPnl: round2(totalPnl),
+    winRate: 0,
+    tradeCount: positions.length,
+    mode: "live",
+    marginFree: accountRes.marginFree,
+    currency: accountRes.ok ? (accountRes as { currency?: string }).currency : undefined,
+    leverage: accountRes.ok ? (accountRes as { leverage?: number }).leverage : undefined,
+  };
+}
+
+export async function placeLiveMarketOrder(data: {
+  symbol: string;
+  side: OrderSide;
+  volume: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  deviation?: number;
+  magic?: number;
+  comment?: string;
+}): Promise<{ ok: boolean; order?: TradeOrder; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = {
+    symbol: data.symbol,
+    side: data.side,
+    volume: data.volume,
+    orderType: "Market",
+    stopLoss: data.stopLoss ?? null,
+    takeProfit: data.takeProfit ?? null,
+    deviation: data.deviation ?? 10,
+    magic: data.magic ?? 0,
+    comment: data.comment ?? "",
+  };
+  const res = await dw.placeMarketOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "market order failed" };
+  const order: TradeOrder = {
+    id: `live-${res.deal || res.order || Date.now()}`,
+    symbol: res.symbol || data.symbol,
+    side: data.side,
+    type: "Market",
+    quantity: res.volume ?? data.volume,
+    entryPrice: res.entry ?? 0,
+    stopLoss: data.stopLoss,
+    takeProfit: data.takeProfit,
+    status: "Open",
+    openedAt: Math.floor(Date.now() / 1000),
+    ticket: res.deal || res.order,
+    magic: data.magic,
+    comment: data.comment,
+    retcode: res.retcode,
+    deal: res.deal,
+  };
+  return { ok: true, order };
+}
+
+export async function placeLiveLimitOrder(data: {
+  symbol: string;
+  side: OrderSide;
+  volume: number;
+  entry: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  deviation?: number;
+  magic?: number;
+  comment?: string;
+}): Promise<{ ok: boolean; order?: TradeOrder; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = {
+    symbol: data.symbol,
+    side: data.side,
+    volume: data.volume,
+    orderType: "Limit",
+    entry: data.entry,
+    stopLoss: data.stopLoss ?? null,
+    takeProfit: data.takeProfit ?? null,
+    deviation: data.deviation ?? 10,
+    magic: data.magic ?? 0,
+    comment: data.comment ?? "",
+  };
+  const res = await dw.placeLimitOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "limit order failed" };
+  const order: TradeOrder = {
+    id: `live-${res.order || Date.now()}`,
+    symbol: res.symbol || data.symbol,
+    side: data.side,
+    type: "Limit",
+    quantity: res.volume ?? data.volume,
+    entryPrice: res.entry ?? data.entry,
+    stopLoss: data.stopLoss,
+    takeProfit: data.takeProfit,
+    status: "Pending",
+    openedAt: Math.floor(Date.now() / 1000),
+    ticket: res.order,
+    magic: data.magic,
+    comment: data.comment,
+    retcode: res.retcode,
+  };
+  return { ok: true, order };
+}
+
+export async function placeLiveStopOrder(data: {
+  symbol: string;
+  side: OrderSide;
+  volume: number;
+  entry: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  deviation?: number;
+  magic?: number;
+  comment?: string;
+}): Promise<{ ok: boolean; order?: TradeOrder; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = {
+    symbol: data.symbol,
+    side: data.side,
+    volume: data.volume,
+    orderType: "Stop",
+    entry: data.entry,
+    stopLoss: data.stopLoss ?? null,
+    takeProfit: data.takeProfit ?? null,
+    deviation: data.deviation ?? 10,
+    magic: data.magic ?? 0,
+    comment: data.comment ?? "",
+  };
+  const res = await dw.placeStopOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "stop order failed" };
+  const order: TradeOrder = {
+    id: `live-${res.order || Date.now()}`,
+    symbol: res.symbol || data.symbol,
+    side: data.side,
+    type: "Stop",
+    quantity: res.volume ?? data.volume,
+    entryPrice: res.entry ?? data.entry,
+    stopLoss: data.stopLoss,
+    takeProfit: data.takeProfit,
+    status: "Pending",
+    openedAt: Math.floor(Date.now() / 1000),
+    ticket: res.order,
+    magic: data.magic,
+    comment: data.comment,
+    retcode: res.retcode,
+  };
+  return { ok: true, order };
+}
+
+export async function placeLiveBracketOrder(data: {
+  symbol: string;
+  side: OrderSide;
+  volume: number;
+  entry: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  deviation?: number;
+  magic?: number;
+  comment?: string;
+}): Promise<{ ok: boolean; order?: TradeOrder; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = {
+    symbol: data.symbol,
+    side: data.side,
+    volume: data.volume,
+    entry: data.entry,
+    stopLoss: data.stopLoss ?? null,
+    takeProfit: data.takeProfit ?? null,
+    deviation: data.deviation ?? 10,
+    magic: data.magic ?? 0,
+    comment: data.comment ?? "",
+  };
+  const res = await dw.placeBracketOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "bracket order failed" };
+  const order: TradeOrder = {
+    id: `live-${res.deal || res.order || Date.now()}`,
+    symbol: res.symbol || data.symbol,
+    side: data.side,
+    type: "Market",
+    quantity: res.volume ?? data.volume,
+    entryPrice: res.entry ?? data.entry,
+    stopLoss: data.stopLoss,
+    takeProfit: data.takeProfit,
+    status: "Open",
+    openedAt: Math.floor(Date.now() / 1000),
+    ticket: res.deal || res.order,
+    magic: data.magic,
+    comment: data.comment,
+    retcode: res.retcode,
+    deal: res.deal,
+  };
+  return { ok: true, order };
+}
+
+export async function modifyLiveOrder(data: {
+  ticket?: number;
+  symbol?: string;
+  stopLoss?: number;
+  takeProfit?: number;
+  magic?: number;
+  comment?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = {
+    ticket: data.ticket ?? 0,
+    symbol: data.symbol ?? "",
+    stopLoss: data.stopLoss ?? null,
+    takeProfit: data.takeProfit ?? null,
+    magic: data.magic ?? 0,
+    comment: data.comment ?? "",
+  };
+  const res = await dw.modifyOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "modify failed" };
+  return { ok: true };
+}
+
+export async function closeLiveOrder(data: { ticket?: number; symbol?: string; volume?: number }): Promise<{ ok: boolean; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const payload = { ticket: data.ticket ?? 0, symbol: data.symbol ?? "", volume: data.volume ?? null };
+  const res = await dw.closeOrder(payload);
+  if (!res.ok) return { ok: false, error: res.error || res.detail || "close failed" };
+  return { ok: true };
+}
+
+export async function closeAllLiveOrders(): Promise<{ ok: boolean; closed?: number; error?: string }> {
+  const dw = window.dwella;
+  if (!dw) return { ok: false, error: "dwella bridge not available" };
+  const res = await dw.closeAllOrders();
+  if (!res.ok) return { ok: false, error: res.detail || "close-all failed" };
+  return { ok: true, closed: res.closed ?? 0 };
+}
+
+export function isLiveModeAvailable(): boolean {
+  return typeof window !== "undefined" && Boolean(window.dwella?.placeMarketOrder);
 }
