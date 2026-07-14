@@ -73,11 +73,11 @@ const esOpeningRange: Strategy = {
       }
       return;
     }
-    if (state.inTrade) return;
     if (position) {
       state.inTrade = true;
       return;
     }
+    state.inTrade = false;
     const avgVol = state.orVolumeSum / state.orBarCount;
     const volOk = bar.volume > avgVol * Number(params.volSurgeMult);
     if (!volOk) return;

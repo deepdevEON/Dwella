@@ -2,12 +2,24 @@ import type { Bar } from "../../replay-engine";
 
 export const ES_TICK = 0.25;
 
+const RTH_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 export function isRTH(bar: Bar): boolean {
-  const d = new Date(bar.time * 1000);
-  const utcH = d.getUTCHours();
-  const utcM = d.getUTCMinutes();
-  const mins = utcH * 60 + utcM;
-  return mins >= 810 && mins < 1200;
+  const parts = RTH_FORMAT.formatToParts(new Date(bar.time * 1000));
+  let h = 0;
+  let m = 0;
+  for (const p of parts) {
+    if (p.type === "hour") h = Number(p.value);
+    else if (p.type === "minute") m = Number(p.value);
+  }
+  const mins = h * 60 + m;
+  // ES futures regular trading hours: 9:30 AM - 4:00 PM CT (DST-aware via tz).
+  return mins >= 570 && mins < 960;
 }
 
 export function sameDay(a: number, b: number): boolean {
@@ -129,17 +141,56 @@ export function stdDev(bars: Bar[], period: number, endIndex: number): number | 
   return Math.sqrt(variance);
 }
 
-export function detectDivergence(bars: Bar[], lookback: number, endIndex: number): "bullish" | "bearish" | null {
-  if (endIndex < lookback + 5) return null;
-  const r = rsi(bars, 14, endIndex);
-  const rPrev = rsi(bars, 14, endIndex - lookback);
-  if (r === null || rPrev === null) return null;
-  const priceLow = Math.min(...Array.from({ length: lookback }, (_, i) => bars[endIndex - i].low));
-  const pricePrevLow = Math.min(...Array.from({ length: lookback }, (_, i) => bars[endIndex - lookback - i].low));
-  const priceHigh = Math.max(...Array.from({ length: lookback }, (_, i) => bars[endIndex - i].high));
-  const pricePrevHigh = Math.max(...Array.from({ length: lookback }, (_, i) => bars[endIndex - lookback - i].high));
-  if (bars[endIndex].low < pricePrevLow && r > rPrev) return "bullish";
-  if (bars[endIndex].high > pricePrevHigh && r < rPrev) return "bearish";
+function findExtrema(bars: Bar[], from: number, to: number, type: "low" | "high"): number[] {
+  const res: number[] = [];
+  if (to - from < 2) return res;
+  for (let i = from; i <= to; i++) {
+    const v = type === "low" ? bars[i].low : bars[i].high;
+    const prev = type === "low" ? bars[i - 1].low : bars[i - 1].high;
+    const next = type === "low" ? bars[i + 1].low : bars[i + 1].high;
+    if (v <= prev && v <= next) res.push(i);
+  }
+  return res;
+}
+
+export function detectDivergence(
+  bars: Bar[],
+  lookback: number,
+  endIndex: number,
+  rsiPeriod = 14,
+): "bullish" | "bearish" | null {
+  if (endIndex < lookback + rsiPeriod + 1) return null;
+  const start = Math.max(rsiPeriod + 1, endIndex - lookback);
+  // Bullish divergence: price makes a lower low while RSI makes a higher low.
+  const lows = findExtrema(bars, start, endIndex, "low");
+  if (lows.length >= 2) {
+    const a = lows[lows.length - 2];
+    const b = lows[lows.length - 1];
+    const rsiA = rsi(bars, rsiPeriod, a);
+    const rsiB = rsi(bars, rsiPeriod, b);
+    if (
+      rsiA !== null && rsiB !== null &&
+      bars[b].low < bars[a].low &&
+      rsiB > rsiA
+    ) {
+      return "bullish";
+    }
+  }
+  // Bearish divergence: price makes a higher high while RSI makes a lower high.
+  const highs = findExtrema(bars, start, endIndex, "high");
+  if (highs.length >= 2) {
+    const a = highs[highs.length - 2];
+    const b = highs[highs.length - 1];
+    const rsiA = rsi(bars, rsiPeriod, a);
+    const rsiB = rsi(bars, rsiPeriod, b);
+    if (
+      rsiA !== null && rsiB !== null &&
+      bars[b].high > bars[a].high &&
+      rsiB < rsiA
+    ) {
+      return "bearish";
+    }
+  }
   return null;
 }
 

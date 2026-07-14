@@ -15,6 +15,16 @@ interface DayState {
 const stateMap = new Map<string, DayState>();
 const todayBarsMap = new Map<string, { time: number }[]>();
 const todayKeyMap = new Map<string, string>();
+const timeIndexCache = new Map<string, { len: number; map: Map<number, number> }>();
+
+function getTimeIndexMap(sym: string, bars: { time: number }[]): Map<number, number> {
+  const cached = timeIndexCache.get(sym);
+  if (cached && cached.len === bars.length) return cached.map;
+  const map = new Map<number, number>();
+  for (let i = 0; i < bars.length; i++) map.set(bars[i].time, i);
+  timeIndexCache.set(sym, { len: bars.length, map });
+  return map;
+}
 
 function dayKey(bar: { time: number }): string {
   const d = new Date(bar.time * 1000);
@@ -47,7 +57,13 @@ const esInstitutional: Strategy = {
     if (prevKey !== dk) {
       if (prevKey && todayBarsMap.has(sym)) {
         const dayBars = todayBarsMap.get(sym)!;
-        const rthBars = dayBars.map(t => bars[bars.findIndex(b => b.time === t.time)]).filter((b): b is { time: number; open: number; high: number; low: number; close: number; volume: number } => b !== undefined && isRTH(b));
+        const timeIndex = getTimeIndexMap(sym, bars);
+        const rthBars = dayBars
+          .map(t => {
+            const i = timeIndex.get(t.time);
+            return i === undefined ? undefined : bars[i];
+          })
+          .filter((b): b is { time: number; open: number; high: number; low: number; close: number; volume: number } => b !== undefined && isRTH(b));
         if (rthBars.length > 0) {
           const nodes = buildVolumeProfile(rthBars);
           const va = computeValueArea(nodes);

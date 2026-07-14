@@ -6,7 +6,18 @@ function sessionKey(bar: { time: number }): string {
   return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
 }
 
-const sessionMap = new Map<string, string>();
+const sessionStartMap = new Map<string, number>();
+
+function sessionStartIndex(sym: string, bars: { time: number }[], index: number, sk: string): number {
+  const cached = sessionStartMap.get(sym);
+  if (cached !== undefined && cached <= index && sessionKey(bars[cached]) === sk) {
+    return cached;
+  }
+  let start = index;
+  while (start > 0 && sessionKey(bars[start - 1]) === sk) start--;
+  sessionStartMap.set(sym, start);
+  return start;
+}
 
 const esMeanReversion: Strategy = {
   id: "es-mean-reversion",
@@ -30,12 +41,8 @@ const esMeanReversion: Strategy = {
     }
     const sym = symbol;
     const sk = sessionKey(bar);
-    if (sessionMap.get(sym) !== sk) sessionMap.set(sym, sk);
-    const sessionBars: typeof bars = [];
-    for (let i = index; i >= 0; i--) {
-      if (sessionKey(bars[i]) !== sk) break;
-      sessionBars.unshift(bars[i]);
-    }
+    const start = sessionStartIndex(sym, bars, index, sk);
+    const sessionBars = bars.slice(start, index + 1);
     if (sessionBars.length < 10) return;
     const vwapVal = vwap(sessionBars, sessionBars.length - 1);
     if (vwapVal === null) return;
@@ -45,7 +52,7 @@ const esMeanReversion: Strategy = {
     const upper = vwapVal + stdMult * stdVal;
     const lower = vwapVal - stdMult * stdVal;
     const stopMult = Number(params.stopMult);
-    const div = detectDivergence(bars, Number(params.divLookback), index);
+    const div = detectDivergence(bars, Number(params.divLookback), index, Number(params.rsiPeriod));
     if (ctx.position) {
       if (ctx.position.side === "long" && bar.close >= vwapVal) ctx.close("vwap-return");
       else if (ctx.position.side === "short" && bar.close <= vwapVal) ctx.close("vwap-return");
