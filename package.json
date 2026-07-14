@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "electron .",
     "dist:mac": "npm run build && electron-builder --mac dmg zip",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
     "dist:dir": "npm run build && electron-builder --dir"
   },
   "dependencies": {"framer-motion":"^12.42.2","react":"^19.2.0","react-dom":"^19.2.0"},
@@ -19,6 +20,9 @@
     "asar": true,
     "files": ["dist/**/*","electron/**/*","package.json"],
     "mac": {"category":"public.app-category.finance","target":["dmg","zip"],"hardenedRuntime":true,"gatekeeperAssess":false},
-    "dmg": {"title":"Dwella ${version}"}
+    "dmg": {"title":"Dwella ${version}"},
+    "win": {"target":["nsis","portable"]},
+    "nsis": {"oneClick":false,"allowToChangeInstallationDirectory":true},
+    "portable": {}
   }
 }
