@@ -284,3 +284,88 @@
   .tp-positions,.tp-watchlist,.tp-time-sales{flex:1 1 300px}
 }
 /* ── End Trading Panel ────────────────────────────────────── */
+
+/* ── AutoTrader Panel ─────────────────────────────────────── */
+.autotrader-panel{display:flex;flex-direction:column;gap:14px}
+.at-top{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start}
+.at-strategies,.at-controls,.at-risk,.at-metrics,.at-signals{border-radius:22px;padding:16px}
+.at-strategy-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:260px;overflow:auto}
+.at-strategy-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.03)}
+.at-strategy-row.running{border-left:3px solid #6fd8aa}
+.at-strategy-row.paused{border-left:3px solid #e7a64f}
+.at-strategy-info{display:flex;flex-direction:column;gap:3px}
+.at-strategy-info b{font-size:13px;color:#eee}
+.at-strategy-info small{font-size:10px;color:#777}
+.at-strategy-meta{font-size:9px;color:#9d8cff;margin-top:2px}
+.at-strategy-controls{display:flex;align-items:center;gap:8px}
+.at-btn{padding:6px 12px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:transparent;color:#aaa;font-size:10px;cursor:pointer;transition:all .15s}
+.at-btn.start{background:rgba(111,218,174,.15);border-color:rgba(111,218,174,.35);color:#6fdaae}
+.at-btn.start:hover:not(:disabled){background:rgba(111,218,174,.25)}
+.at-btn.pause{background:rgba(231,166,79,.15);border-color:rgba(231,166,79,.35);color:#e7a64f}
+.at-btn.pause:hover:not(:disabled){background:rgba(231,166,79,.25)}
+.at-btn.resume{background:rgba(104,80,220,.2);border-color:rgba(150,130,255,.4);color:#b292ff}
+.at-btn.resume:hover:not(:disabled){background:rgba(104,80,220,.3)}
+.at-btn.stop{background:rgba(241,132,137,.15);border-color:rgba(241,132,137,.35);color:#f18489}
+.at-btn.stop:hover:not(:disabled){background:rgba(241,132,137,.25)}
+.at-btn:disabled{opacity:.35;cursor:not-allowed}
+.at-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer;width:36px;height:20px}
+.at-toggle input{opacity:0;width:0;height:0}
+.at-toggle span{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:10px;transition:all .2s}
+.at-toggle span::before{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.at-toggle input:checked+span{background:linear-gradient(145deg,#6b50d8,#8975ef)}
+.at-toggle input:checked+span::before{transform:translateX(16px)}
+.at-config-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.at-config-grid label{display:flex;flex-direction:column;gap:5px;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.4px}
+.at-config-grid select,.at-config-grid input,.at-risk-grid input{border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.04);color:#fff;font:11px ui-monospace,monospace;padding:8px 10px;outline:none;width:100%}
+.at-config-grid select:disabled,.at-config-grid input:disabled{opacity:.5}
+.at-readonly{color:#777;font-size:11px}
+.at-middle{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start}
+.at-risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.at-risk-grid label{display:flex;flex-direction:column;gap:5px;font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.4px}
+.at-risk-status{display:flex;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:10px;color:#aaa}
+.at-risk-status .pos{color:#6fd8aa}
+.at-risk-status .neg{color:#f18489}
+.at-metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.at-metric{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 13px;display:flex;flex-direction:column;gap:4px}
+.at-metric b{font:italic 21px 'Instrument Serif';display:block}
+.at-metric small{font-size:9px;color:#8a878f;text-transform:uppercase;letter-spacing:.4px}
+.at-signals{min-height:220px}
+.at-pending{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.at-pending-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:10px}
+.at-pending-sym{font:italic 14px 'Instrument Serif';color:#c084fc}
+.at-pending-action{font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid}
+.at-pending-action.buy{color:#6fd8aa;border-color:#6fd8aa44}
+.at-pending-action.sell{color:#f18489;border-color:#f1848944}
+.at-pending-action.close{color:#e7a64f;border-color:#e7a64f44}
+.at-pending-status{font-size:9px;padding:2px 6px;border-radius:4px}
+.at-pending-status.pending{color:#7487ff}
+.at-pending-status.placed{color:#e7a64f}
+.at-pending-status.filled{color:#6fd8aa}
+.at-pending-status.failed{color:#f18489}
+.at-pending-status.retrying{color:#e7a64f}
+.at-signal-list{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto;margin-top:10px}
+.at-signal{border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;background:rgba(255,255,255,.03)}
+.at-signal.buy{border-left:3px solid #6fd8aa}
+.at-signal.sell{border-left:3px solid #f18489}
+.at-signal.close{border-left:3px solid #e7a64f}
+.at-signal-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.at-signal-sym{font:italic 18px 'Instrument Serif';color:#c084fc}
+.at-signal-action{font-size:9px;padding:3px 8px;border-radius:6px;border:1px solid}
+.at-signal-action.buy{color:#6fd8aa;border-color:#6fd8aa44}
+.at-signal-action.sell{color:#f18489;border-color:#f1848944}
+.at-signal-action.close{color:#e7a64f;border-color:#e7a64f44}
+.at-signal-time{font-size:9px;color:#69686e;margin-left:auto}
+.at-signal-reason{font-size:10px;color:#9a989e;margin:6px 0;line-height:1.5}
+.at-signal-levels{display:flex;gap:14px;flex-wrap:wrap}
+.at-signal-levels span{display:grid}
+.at-signal-levels small{font-size:8px;color:#69686e}
+.at-signal-levels b{font-size:11px}
+.at-signal-levels .pos{color:#6fd8aa}
+.at-signal-levels .neg{color:#f18489}
+.at-empty{color:#69686e;font-size:11px;text-align:center;padding:20px}
+@media(max-width:1100px){
+  .at-top{grid-template-columns:1fr}
+  .at-middle{grid-template-columns:1fr}
+  .at-config-grid,.at-risk-grid{grid-template-columns:repeat(2,1fr)}
+}
+/* ── End AutoTrader Panel ─────────────────────────────────── */
