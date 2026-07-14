@@ -10,6 +10,9 @@ import { GCTrendStrategy } from "../strategies/gc-trend/strategy";
 import { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
 import { NQMomentumStrategy, createNQMomentumStrategy } from "../strategies/nq-momentum/strategy";
 import { NQOptimizedStrategy, createNQOptimizedStrategy, bollingerBands } from "../strategies/nq-momentum/optimized";
+import { ESInstitutionalStrategy } from "../strategies/es-institutional/strategy";
+import { ESMeanReversionStrategy } from "../strategies/es-institutional/mean-reversion";
+import { ESOpeningRangeStrategy } from "../strategies/es-institutional/opening-range";
 
 export { GCTrendStrategy } from "../strategies/gc-trend/strategy";
 export { GCBreakoutStrategy } from "../strategies/gc-trend/breakout";
@@ -180,7 +183,7 @@ const mtfMomentum: Strategy = {
   },
 };
 
-export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum, GCTrendStrategy, GCBreakoutStrategy, NQMomentumStrategy, NQOptimizedStrategy];
+export const BUILTIN_STRATEGIES: Strategy[] = [smaCross, rsiReversion, mtfMomentum, GCTrendStrategy, GCBreakoutStrategy, NQMomentumStrategy, NQOptimizedStrategy, ESInstitutionalStrategy, ESMeanReversionStrategy, ESOpeningRangeStrategy];
 
 export function getStrategy(id: string): Strategy | undefined {
   return BUILTIN_STRATEGIES.find(s => s.id === id);
