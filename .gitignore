@@ -28,3 +28,6 @@ trading/dwella_auth.db
 trading/data/
 trading/exports/
 trading/helios_analysis/
+
+# browser POC env with API key
+browserbase-trader/.env
