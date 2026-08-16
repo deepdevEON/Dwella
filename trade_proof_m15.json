@@ -1,0 +1,40 @@
+[
+  {
+    "type": "entry_filled",
+    "dir": "long",
+    "entry": 29932.5,
+    "stopLoss": 29901.5,
+    "target": 30025.5,
+    "risk": "1240",
+    "timestamp": 1783345500,
+    "fvg": {
+      "type": "bullish",
+      "top": 29896,
+      "bottom": 29865,
+      "size": 31,
+      "midpoint": 29880.5,
+      "displacementBar": 87,
+      "displacementTime": 1783344600
+    }
+  },
+  {
+    "type": "exit",
+    "reason": "target",
+    "exit": 30025.5,
+    "pnl": 3720,
+    "timestamp": 1783346400,
+    "trade": {
+      "entryTime": "2026-07-06 13:45",
+      "exitTime": "2026-07-06 14:00",
+      "type": "long",
+      "entry": 29932.5,
+      "exit": 30025.5,
+      "pnl": 3720,
+      "rr": "3.00",
+      "reason": "target",
+      "barsHeld": 1,
+      "fvgSize": 31,
+      "trails": 0
+    }
+  }
+]
