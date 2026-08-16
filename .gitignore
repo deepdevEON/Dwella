@@ -1,0 +1,30 @@
+# dependencies / build output
+node_modules/
+packaging/
+_Dwella_dev_backup/
+build/
+dist/
+dist-terminal/
+.pytest_cache/
+
+# python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# logs
+*.log
+logs/
+
+# runtime state & credentials (do not commit)
+mt5/accounts.json
+mt5/*_history.json
+mt5/daily_journal.json
+mt5/managed_trades.json
+mt5/scanner_daily.json
+trading/dwella_auth.db
+trading/data/
+trading/exports/
+trading/helios_analysis/

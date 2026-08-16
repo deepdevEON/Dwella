@@ -1,0 +1,31 @@
+{
+  "name": "flourish-trading-app",
+  "private": true,
+  "version": "2.4.1",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "electron .",
+    "desktop": "npm run build && electron .",
+    "desktop:dev": "DWELLA_REACT_DEV=1 electron .",
+    "mt5": "python3 mt5/mt5_live_server.py"
+  },
+  "dependencies": {
+    "lucide-react": "^0.380.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.19",
+    "electron": "^31.0.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.11"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "strategy": "SVR",
+  "name": "Session Volume Rotation",
+  "status": "research_only_not_live",
+  "source": "packaging/tradingview-mcp/data/mt5_m1_timeframe.json",
+  "timezone": "UTC",
+  "month_requested": "2026-07",
+  "data_coverage": "2026-07-08 through 2026-07-30; 2026-07-01 through 2026-07-07 and 2026-07-31 unavailable",
+  "method": {
+    "sessions": {"asia": "00:00-08:00", "london": "08:00-16:00", "new_york": "13:00-21:00"},
+    "profile": "OHLCV typical-price volume-at-price profile, 24 buckets, 70% value area",
+    "setups": ["NY failed auction of Asia/London extreme back into value", "NY continuation after two composite-value closes with expanding volume and POC migration"],
+    "risk": "one trade per symbol per UTC day, stop beyond sweep or prior bar, 1.5R target, conservative stop-first same-bar resolution",
+    "bar_policy": "3-minute fixed UTC buckets from captured 1-minute data; decisions use completed bars only",
+    "cost_sensitivity": "adjusted result subtracts a conservative two-tick round trip per trade"
+  },
+  "results_r": {
+    "MNQU26": {"trades": 11, "wins": 4, "losses": 7, "win_rate": 0.3636, "raw_total_r": -1.0, "after_two_tick_cost_r": -1.1254, "max_drawdown_r": 3.5, "profit_factor": 0.8571},
+    "MESU26": {"trades": 13, "wins": 8, "losses": 5, "win_rate": 0.6154, "raw_total_r": 7.0, "after_two_tick_cost_r": 5.7962, "max_drawdown_r": 2.0, "profit_factor": 2.4},
+    "GCEQ26": {"trades": 9, "wins": 4, "losses": 5, "win_rate": 0.4444, "raw_total_r": 1.0, "after_two_tick_cost_r": 0.6707, "max_drawdown_r": 3.0, "profit_factor": 1.2},
+    "combined": {"trades": 33, "wins": 16, "raw_total_r": 7.0, "after_two_tick_cost_r": 5.3414, "max_drawdown_r": 6.647, "note": "combined drawdown is sequential across symbols and is not a portfolio-margin simulation"}
+  },
+  "calendar_days": {
+    "MNQU26": {"2026-07-01": null, "2026-07-02": null, "2026-07-03": null, "2026-07-04": null, "2026-07-05": null, "2026-07-06": null, "2026-07-07": null, "2026-07-08": 0.0, "2026-07-09": -1.0, "2026-07-10": 1.5, "2026-07-11": null, "2026-07-12": 0.0, "2026-07-13": -1.0, "2026-07-14": 0.0, "2026-07-15": -1.0, "2026-07-16": -1.0, "2026-07-17": 1.5, "2026-07-18": null, "2026-07-19": 0.0, "2026-07-20": -1.0, "2026-07-21": -1.0, "2026-07-22": 1.5, "2026-07-23": 0.0, "2026-07-24": 0.0, "2026-07-25": null, "2026-07-26": 0.0, "2026-07-27": 0.0, "2026-07-28": 0.0, "2026-07-29": -1.0, "2026-07-30": 1.5, "2026-07-31": null},
+    "MESU26": {"2026-07-01": null, "2026-07-02": null, "2026-07-03": null, "2026-07-04": null, "2026-07-05": null, "2026-07-06": null, "2026-07-07": null, "2026-07-08": 0.0, "2026-07-09": -1.0, "2026-07-10": 1.5, "2026-07-11": null, "2026-07-12": 0.0, "2026-07-13": -1.0, "2026-07-14": 0.0, "2026-07-15": -1.0, "2026-07-16": 0.0, "2026-07-17": 1.5, "2026-07-18": null, "2026-07-19": 0.0, "2026-07-20": -1.0, "2026-07-21": 1.5, "2026-07-22": 1.5, "2026-07-23": -1.0, "2026-07-24": 1.5, "2026-07-25": null, "2026-07-26": 0.0, "2026-07-27": 1.5, "2026-07-28": 1.5, "2026-07-29": 1.5, "2026-07-30": 0.0, "2026-07-31": null},
+    "GCEQ26": {"2026-07-01": null, "2026-07-02": null, "2026-07-03": null, "2026-07-04": null, "2026-07-05": null, "2026-07-06": null, "2026-07-07": null, "2026-07-08": -1.0, "2026-07-09": -1.0, "2026-07-10": 0.0, "2026-07-11": null, "2026-07-12": 0.0, "2026-07-13": -1.0, "2026-07-14": 0.0, "2026-07-15": 1.5, "2026-07-16": 0.0, "2026-07-17": 1.5, "2026-07-18": null, "2026-07-19": 0.0, "2026-07-20": 0.0, "2026-07-21": 0.0, "2026-07-22": 0.0, "2026-07-23": 0.0, "2026-07-24": -1.0, "2026-07-25": null, "2026-07-26": 0.0, "2026-07-27": 0.0, "2026-07-28": -1.0, "2026-07-29": 1.5, "2026-07-30": 1.5, "2026-07-31": null}
+  },
+  "decision": "Do not enable live execution yet: only 20 calendar dates have data, one month is too small to establish profitability, MNQU26 is negative, and no slippage/commission/portfolio margin model is included. MESU26 is the strongest research result, but it still needs out-of-sample validation."
+}
