@@ -527,7 +527,7 @@ async function generateVisualProof(state) {
 
   // We'll use the browser-use agent to navigate to each trade's timestamp
   // For now, log the trade proof data
-  const proofFile = "/Users/gid/Downloads/dwella-desktop 2/trade_proof.json";
+  const proofFile = "trade_proof.json";
   const proofData = state.tradeProofs.map(p => ({
     ...p,
     symbol: CONFIG.symbol,
@@ -604,8 +604,8 @@ async function main() {
   await generateVisualProof(state);
 
   console.log("\n✅ All iterations complete!");
-  console.log("📓 Journal: /Users/gid/Downloads/dwella-desktop 2/trading-journal.md");
-  console.log("📸 Trade proof: /Users/gid/Downloads/dwella-desktop 2/trade_proof.json");
+  console.log("📓 Journal: docs/trading-journal.md");
+  console.log("📸 Trade proof: trade_proof.json");
   
   // Find best iteration
   // (simplified - just print for now)

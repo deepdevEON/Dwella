@@ -403,10 +403,10 @@ async function main() {
   console.log(report);
   
   // Save proof data
-  const proofPath = "/Users/gid/Downloads/dwella-desktop 2/trade_proof_m15.json";
+  const proofPath = "trade_proof_m15.json";
   fs.writeFileSync(proofPath, JSON.stringify(state.tradeProofs, null, 2));
   console.log(`\n✅ Proof saved to ${proofPath}`);
-  console.log(`📓 Journal: /Users/gid/Downloads/dwella-desktop 2/trading-journal.md`);
+  console.log(`📓 Journal: docs/trading-journal.md`);
 }
 
 main().catch(e => { console.error("❌", e.message); process.exit(1); });

@@ -5,7 +5,18 @@ _Dwella_dev_backup/
 build/
 dist/
 dist-terminal/
+isolate/
 .pytest_cache/
+
+# typescript incremental build state
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# editor/agent session state
+.claude/
+
+# backtest generated proof output
+trade_proof*.json
 
 # python
 __pycache__/
@@ -29,5 +40,6 @@ trading/data/
 trading/exports/
 trading/helios_analysis/
 
-# browser POC env with API key
+# local browser service secrets and persistent Chromium profile
 browserbase-trader/.env
+browserbase-trader/.playwright-tradingview/

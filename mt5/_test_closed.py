@@ -1,5 +1,6 @@
 import sys, time, json
-sys.path.insert(0, '/Users/gid/Documents/Flourish/mt5')
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tv_sidecar as s
 
 def visible_names():

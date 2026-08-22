@@ -517,7 +517,7 @@ ${ref}
 **Decisions Log:** ${result.state.decisions.length} decisions recorded
 `;
 
-  const journalPath = "/Users/gid/Downloads/dwella-desktop 2/trading-journal.md";
+  const journalPath = "docs/trading-journal.md";
   fs.appendFileSync(journalPath, journalEntry);
   
   // Restore old config
