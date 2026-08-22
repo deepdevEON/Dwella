@@ -15,8 +15,21 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { buildOrder, executeOrder, fetchOpenOrders } from '../lib/execution.js';
 
-const SIDECAR_URL = 'http://127.0.0.1:18814';
-const AUTH_URL = 'http://127.0.0.1:18815';
+const LOCAL_SIDECAR_URL = 'http://127.0.0.1:18814';
+const WEB_RUNTIME = typeof window !== 'undefined' && window.location.protocol !== 'file:';
+const DESKTOP_RUNTIME = typeof window !== 'undefined'
+  && (window.location.protocol === 'file:' || Boolean(window.electronAPI));
+const CONFIGURED_SIDECAR_URL = import.meta.env.VITE_TRADING_BRIDGE_URL || '';
+const LOCAL_BRIDGE_URL_PATTERN = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?(?:\/|$)/i;
+const SIDECAR_URL = (
+  WEB_RUNTIME && LOCAL_BRIDGE_URL_PATTERN.test(CONFIGURED_SIDECAR_URL)
+    ? ''
+    : CONFIGURED_SIDECAR_URL || (DESKTOP_RUNTIME ? LOCAL_SIDECAR_URL : '')
+).replace(/\/$/, '');
+const SIDECAR_TOKEN = import.meta.env.VITE_TRADING_BRIDGE_TOKEN || '';
+const BRIDGE_NOT_CONFIGURED = 'No Linux trading bridge is configured. Paper mode remains available.';
+const AUTH_URL = import.meta.env.VITE_AUTH_API_URL
+  || (WEB_RUNTIME ? '' : 'http://127.0.0.1:18815');
 const SYMBOLS = ['ENQ', 'MES', 'GCE', 'YM', 'ES', 'RTY', 'CL', 'SI', 'NQ'];
 const POLL_MS = 4000;
 const FETCH_TIMEOUT_MS = 3500;
@@ -39,6 +52,13 @@ async function fetchJson(url, timeoutMs, init) {
   } finally {
     clearTimeout(t);
   }
+}
+
+function bridgeRequest(path, timeoutMs, init) {
+  if (!SIDECAR_URL) return Promise.reject(new Error(BRIDGE_NOT_CONFIGURED));
+  const headers = new Headers(init?.headers || {});
+  if (SIDECAR_TOKEN) headers.set('Authorization', `Bearer ${SIDECAR_TOKEN}`);
+  return fetchJson(`${SIDECAR_URL}${path}`, timeoutMs, { ...init, headers });
 }
 
 function mapCandle(row) {
@@ -91,9 +111,9 @@ function mergeTape(previous = [], next = [], limit = INITIAL_TAPE_COUNT) {
 
 async function fetchSymbolData(symbol, candleCount, tapeCount) {
   const [candleResult, tapeResult, bookResult] = await Promise.all([
-    fetchJson(`${SIDECAR_URL}/candles?symbol=${symbol}&count=${candleCount}`, FETCH_TIMEOUT_MS).catch(() => null),
-    fetchJson(`${SIDECAR_URL}/tape?symbol=${symbol}&count=${tapeCount}`, FETCH_TIMEOUT_MS).catch(() => null),
-    fetchJson(`${SIDECAR_URL}/book?symbol=${symbol}`, FETCH_TIMEOUT_MS).catch(() => null),
+    bridgeRequest(`/candles?symbol=${symbol}&count=${candleCount}`, FETCH_TIMEOUT_MS).catch(() => null),
+    bridgeRequest(`/tape?symbol=${symbol}&count=${tapeCount}`, FETCH_TIMEOUT_MS).catch(() => null),
+    bridgeRequest(`/book?symbol=${symbol}`, FETCH_TIMEOUT_MS).catch(() => null),
   ]);
   return {
     symbol,
@@ -168,6 +188,12 @@ export function MT5Provider({ children }) {
   }, []);
   const poll = useCallback(async () => {
     if (inFlight.current) return;
+    if (!SIDECAR_URL) {
+      if (mounted.current) {
+        setState((prev) => ({ ...prev, checking: false, connected: false, error: null }));
+      }
+      return;
+    }
     inFlight.current = true;
     let connected = false;
     let error = null;
@@ -179,7 +205,7 @@ export function MT5Provider({ children }) {
     let alerts = null;
     let openOrders = null;
     try {
-      const status = await fetchJson(`${SIDECAR_URL}/status`, FETCH_TIMEOUT_MS);
+      const status = await bridgeRequest('/status', FETCH_TIMEOUT_MS);
       connected = !!status?.connected;
       error = status?.error || null;
       lastUpdate = status?.last_update || null;
@@ -216,7 +242,7 @@ export function MT5Provider({ children }) {
       }
 
       [alerts, openOrders] = await Promise.all([
-        fetchJson(`${SIDECAR_URL}/alerts`, FETCH_TIMEOUT_MS).catch(() => null),
+        bridgeRequest('/alerts', FETCH_TIMEOUT_MS).catch(() => null),
         fetchOpenOrders(SIDECAR_URL).catch(() => null),
       ]);
     } catch (err) {
@@ -286,7 +312,7 @@ export function MT5Provider({ children }) {
   // ── Alert actions ──
   const createAlert = useCallback(async (symbol, condition, price, note) => {
     try {
-      const res = await fetchJson(`${SIDECAR_URL}/alerts`, FETCH_TIMEOUT_MS, {
+      const res = await bridgeRequest('/alerts', FETCH_TIMEOUT_MS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol, condition, price, note }),
@@ -299,7 +325,7 @@ export function MT5Provider({ children }) {
 
   const deleteAlert = useCallback(async (alertId) => {
     try {
-      const res = await fetchJson(`${SIDECAR_URL}/alerts?id=${alertId}`, FETCH_TIMEOUT_MS, {
+      const res = await bridgeRequest(`/alerts?id=${alertId}`, FETCH_TIMEOUT_MS, {
         method: 'DELETE',
       });
       return res;

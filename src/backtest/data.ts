@@ -13,6 +13,8 @@ export interface MultiTimeframeData {
   series: Partial<Record<Timeframe, Bar[]>>;
   /** For each base bar index, the active bar of each higher timeframe (or null). */
   aligned: Partial<Record<Timeframe, (Bar | null)[]>>;
+  /** Data source used for every timeframe in this load. */
+  source: "live" | "synthetic" | "mixed";
   gapsFilled: number;
 }
 
@@ -23,6 +25,8 @@ export interface LoadOptions {
   endDate?: number;
   /** Force synthetic data instead of querying the bridge. */
   synthetic?: boolean;
+  /** Refuse synthetic fallback when a real market-data provider is unavailable. */
+  requireLive?: boolean;
 }
 
 export type BarsProvider = (
@@ -37,9 +41,7 @@ function bridgeProvider(
   tf: Timeframe,
   opts: { count: number; startDate?: number; endDate?: number },
 ): Promise<Bar[]> {
-  if (typeof window === "undefined" || !(window as { dwella?: unknown }).dwella) {
-    return Promise.resolve([]);
-  }
+  if (typeof window === "undefined") return Promise.resolve([]);
   const w = window as unknown as {
     dwella?: {
       getMarketBars?: (
@@ -48,8 +50,15 @@ function bridgeProvider(
         c?: number,
       ) => Promise<{ ok?: boolean; bars?: { t: number; o: number; h: number; l: number; c: number; v: number }[] }>;
     };
+    electronAPI?: {
+      getMarketBars?: (
+        s: string,
+        t: string,
+        c?: number,
+      ) => Promise<{ ok?: boolean; bars?: { t: number; o: number; h: number; l: number; c: number; v: number }[] }>;
+    };
   };
-  const getBars = w.dwella?.getMarketBars;
+  const getBars = w.dwella?.getMarketBars ?? w.electronAPI?.getMarketBars;
   if (!getBars) return Promise.resolve([]);
   return getBars(symbol, tf, opts.count).then(res => {
     if (!res?.ok || !res.bars) return [];
@@ -76,11 +85,19 @@ export class DataManager {
     const count = opts.count ?? this.defaultCount(base);
 
     const raw: Partial<Record<Timeframe, Bar[]>> = {};
+    const sources: Partial<Record<Timeframe, "live" | "synthetic">> = {};
     await Promise.all(
       timeframes.map(async tf => {
         let bars = await this.provider(symbol, tf, { count, startDate: opts.startDate, endDate: opts.endDate });
-        if (opts.synthetic || !bars.length) {
+        const useSynthetic = opts.synthetic || !bars.length;
+        if (useSynthetic && opts.requireLive && !opts.synthetic) {
+          throw new Error(`No live TradingView data available for ${symbol} ${tf}. Start the signed-in TradingView session and try again.`);
+        }
+        if (useSynthetic) {
           bars = generateSyntheticBars(symbol, count, tf);
+          sources[tf] = "synthetic";
+        } else {
+          sources[tf] = "live";
         }
         const filled = DataManager.gapFill(bars, tf);
         raw[tf] = filled.bars;
@@ -116,7 +133,13 @@ export class DataManager {
       }
     }
 
-    return { symbol, base, series: raw, aligned, gapsFilled };
+    const sourceValues = timeframes.map(tf => sources[tf]).filter(Boolean);
+    const source = sourceValues.every(value => value === "live")
+      ? "live"
+      : sourceValues.every(value => value === "synthetic")
+        ? "synthetic"
+        : "mixed";
+    return { symbol, base, series: raw, aligned, source, gapsFilled };
   }
 
   /** Reasonable default lookback (bars) per timeframe. */

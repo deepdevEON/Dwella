@@ -62,9 +62,9 @@ export function createNQMomentumStrategy(mode?: StrategyMode): Strategy {
       const price = bars[index].close;
 
       const h1Bar = tf["H1"] ?? null;
-      const m15Bar = tf["M15"] ?? null;
-
-      const h1Sma = h1Bar ? sma([h1Bar], 1, 0) : null;
+      const h1Bars = ctx.tfBars?.["H1"] ?? [];
+      const h1Index = h1Bar ? h1Bars.findIndex(candidate => candidate.time === h1Bar.time) : -1;
+      const h1Sma = h1Index >= 0 ? sma(h1Bars, smaPeriod, h1Index) : null;
       const baseRsi = rsi(bars, rsiPeriod, index);
 
       let trendUp = false;
@@ -151,8 +151,10 @@ export function createNQMomentumStrategy(mode?: StrategyMode): Strategy {
       }
 
       const todayRange = currentDayRanges.get(dayKey);
-      const prevDayKey = dayKey - 1;
-      const prevRange = currentDayRanges.get(prevDayKey);
+      const previousDays = [...currentDayRanges.keys()]
+        .filter(key => key < dayKey)
+        .sort((a, b) => b - a);
+      const prevRange = previousDays.length ? currentDayRanges.get(previousDays[0]) : undefined;
 
       if (!prevRange || prevRange.high <= prevRange.low) return;
 

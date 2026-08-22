@@ -17,30 +17,23 @@ if (!window.dwella) {
     startHermes: () => ok(), stopHermes: () => ok(), askHermes: () => ok(),
 
     openExternal: async () => {},
+    openTradingViewLogin: async () => {
+      const popup = window.open("https://www.tradingview.com/accounts/signin/", "dwella-tradingview-login", "popup=yes,width=460,height=760,resizable=yes,scrollbars=yes");
+      return popup
+        ? { ok: true, message: "TradingView sign-in opened." }
+        : { ok: false, message: "Allow pop-ups for Dwella to open TradingView sign-in." };
+    },
     getMarketQuotes: async () => {
       // Browser preview talks to the MT5 bridge directly; Electron proxies via main process.
       try { const r = await fetch("http://127.0.0.1:8643/quotes"); const b = await r.json(); return b.ok ? b.quotes : []; } catch { return []; }
     },
     getMarketBars: async (s, tf, count = 180) => {
-      try {
-        const live = await (await fetch(`http://127.0.0.1:8643/bars?s=${s}&tf=${tf}&count=${count}`)).json();
-        if (live?.ok && live.bars?.length) return live;
-      } catch { /* bridge offline — fall through to demo bars */ }
-      // Demo bars: deterministic random walk so the preview terminal always renders.
-      const base = s === "NQ" ? 18500 : s === "GC" ? 2350 : 5390;
-      const stepMin = tf === "M1" ? 1 : tf === "M5" ? 5 : tf === "M15" ? 15 : tf === "H1" ? 60 : 1440;
-      let seed = [...`${s}${tf}`].reduce((a, ch) => a + ch.charCodeAt(0), 0);
-      const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280 - 0.5; };
-      let close = base;
-      const bars: MarketBar[] = Array.from({ length: count }, (_, i) => {
-        const o = close, drift = rnd() * base * 0.0022;
-        const c = o + drift;
-        const h = Math.max(o, c) + Math.abs(rnd()) * base * 0.001;
-        const l = Math.min(o, c) - Math.abs(rnd()) * base * 0.001;
-        close = c;
-        return { t: Date.now() - (count - i) * stepMin * 60000, o, h, l, c, v: Math.round(500 + Math.abs(rnd()) * 2000) };
-      });
-      return { ok: true, symbol: `${s} (demo)`, tf, src: "demo", bars };
+      const interval = { M1: "1", M5: "5", M15: "15", M30: "30", H1: "60", H4: "240", D1: "D" }[tf] || tf;
+      const params = new URLSearchParams({ symbol: s, timeframe: interval, count: String(count) });
+      const response = await fetch(`/market/bars?${params.toString()}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "TradingView live market data is unavailable.");
+      return payload;
     },
     getAccount: async () => {
       try { return await (await fetch("http://127.0.0.1:8643/account")).json(); } catch { return { ok: false }; }

@@ -7,19 +7,25 @@ and position information. No MetaTrader 5 dependency.
 
 Endpoints (JSON):
     GET  /status              -> { connected, symbols, last_update, error, ticks, candle_counts, account, positions }
+    GET  /health              -> { ok, provider, execution: { ready } }
     GET  /tick?symbol=ENQ     -> { symbol, tick: { bid, ask, last, time } }
     GET  /candles?symbol=ENQ  -> { symbol, timeframe, candles: [...] }
     GET  /account             -> { account: {...} }
     GET  /positions           -> { positions: [...] }
-    GET  /tv/status           -> { tradovate: {...} }
+    GET  /tv/status           -> { provider, connected, account_connected, execution: { ready }, tradovate: {...} }
     POST /tv/token            -> accept tokens from webview (accessToken, mdAccessToken, env)
     POST /tv/logout           -> end session
+
+When bound to a non-loopback host, set DWELLA_TRADING_BRIDGE_TOKEN. The
+browser-facing client sends that value as a bearer token and the handler also
+answers CORS preflight requests for the remote web app.
 
 Run:  python3 tradovate_server.py           (default: http 127.0.0.1:18814)
 """
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import signal
@@ -304,17 +310,61 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a) -> None:
         pass
 
+    def _origin_header(self) -> Optional[str]:
+        origin = self.headers.get("Origin")
+        allowed = getattr(self.server, "allowed_origins", "*")
+        if allowed == "*" or not origin:
+            return "*"
+        allowed_values = {item.strip() for item in allowed.split(",") if item.strip()}
+        return origin if origin in allowed_values else None
+
     def _send(self, code: int, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self._origin_header()
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
+    def _authorized(self) -> bool:
+        required = bool(getattr(self.server, "require_auth", False))
+        if not required:
+            return True
+        expected = getattr(self.server, "bridge_token", "")
+        authorization = self.headers.get("Authorization", "")
+        supplied = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        if expected and supplied and hmac.compare_digest(supplied, expected):
+            return True
+        status = 503 if not expected else 401
+        message = (
+            "Remote bridge authentication is not configured. Set DWELLA_TRADING_BRIDGE_TOKEN before exposing this service."
+            if not expected else "Invalid or missing bridge token."
+        )
+        self._send(status, {"ok": False, "error": message})
+        return False
+
+    def _guard(self) -> bool:
+        return self._authorized()
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(204)
+        origin = self._origin_header()
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.end_headers()
+
     # ── GET ─────────────────────────────────────────────────────────────
     def do_GET(self) -> None:  # noqa: N802
+        if not self._guard():
+            return
         state: State = self.server.state
         tv: TradovateSession = self.server.tv
         path = self.path.split("?")[0]
@@ -371,8 +421,22 @@ class Handler(BaseHTTPRequestHandler):
                 payload = state.positions
             self._send(200, {"positions": payload}); return
 
+        if path == "/health":
+            self._send(200, {"ok": True, "provider": "Tradovate", "execution": {"ready": bool(tv.token and tv.account_id)}}); return
+
         if path == "/tv/status":
-            self._send(200, {"tradovate": tv.status()}); return
+            status = tv.status()
+            connected = bool(status.get("loggedIn"))
+            account_connected = bool(status.get("accountId"))
+            self._send(200, {
+                "provider": "Tradovate",
+                "connected": connected,
+                "account_connected": account_connected,
+                "account_fresh": account_connected,
+                "executionReady": bool(connected and account_connected),
+                "execution": {"ready": bool(connected and account_connected)},
+                "tradovate": status,
+            }); return
 
         if path == "/tv/openorders":
             if not tv.token:
@@ -385,6 +449,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── DELETE ──────────────────────────────────────────────────────────
     def do_DELETE(self) -> None:  # noqa: N802
+        if not self._guard():
+            return
         tv: TradovateSession = self.server.tv
         path = self.path.split("?")[0]
         if path == "/tv/cancel":
@@ -406,6 +472,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ────────────────────────────────────────────────────────────
     def do_POST(self) -> None:  # noqa: N802
+        if not self._guard():
+            return
         tv: TradovateSession = self.server.tv
         path = self.path.split("?")[0]
         try:
@@ -452,6 +520,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/tv/order":
             if not tv.token:
                 self._send(400, {"ok": False, "error": "Not logged in to Tradovate"}); return
+            if not tv.account_id:
+                self._send(409, {"ok": False, "error": "Tradovate account is not resolved yet; verify the bridge before trading."}); return
             action = body.get("action") or ""  # Buy / Sell
             symbol = body.get("symbol") or ""  # e.g. ENQ, MES, GCE
             order_type = body.get("orderType") or "Market"  # Market / Limit / Stop
@@ -539,6 +609,11 @@ def main(argv: list[str] | None = None) -> int:
 
     state = State()
     tv = TradovateSession()
+    bridge_token = os.environ.get("DWELLA_TRADING_BRIDGE_TOKEN", "").strip()
+    loopback_bind = args.http_host in ("127.0.0.1", "localhost", "::1")
+    require_auth = bool(bridge_token) or not loopback_bind
+    if not loopback_bind and not bridge_token:
+        print("Remote bind requested without DWELLA_TRADING_BRIDGE_TOKEN; requests will be rejected until the bridge is protected.", flush=True)
 
     poller = threading.Thread(target=poll_loop, args=(tv, state, args.poll), daemon=True)
     poller.start()
@@ -546,6 +621,9 @@ def main(argv: list[str] | None = None) -> int:
     server = ThreadingHTTPServer((args.http_host, args.http_port), Handler)
     server.state = state
     server.tv = tv
+    server.bridge_token = bridge_token
+    server.require_auth = require_auth
+    server.allowed_origins = os.environ.get("DWELLA_ORIGIN", "*").strip() or "*"
 
     def _stop(_sig, _frame):
         print("\nShutting down...", flush=True)

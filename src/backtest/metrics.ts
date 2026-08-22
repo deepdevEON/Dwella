@@ -152,8 +152,13 @@ export class MetricsCalculator {
 
     const maxDD = equityCurve.reduce((mx, p) => Math.min(mx, p.drawdown), 0);
     const maxDrawdownPct = round2(Math.abs(maxDD));
-    const peakEquity = Math.max(...equityCurve.map(p => p.equity), initialCapital);
-    const maxDrawdownValue = round2(peakEquity - Math.min(...equityCurve.map(p => p.equity)));
+    let runningPeak = initialCapital;
+    let maxDrawdownValueRaw = 0;
+    for (const point of equityCurve) {
+      runningPeak = Math.max(runningPeak, point.equity);
+      maxDrawdownValueRaw = Math.max(maxDrawdownValueRaw, runningPeak - point.equity);
+    }
+    const maxDrawdownValue = round2(maxDrawdownValueRaw);
 
     const totalReturnPct = round2(((finalEquity - initialCapital) / initialCapital) * 100);
     const days = Math.max(1, (result.endDate - result.startDate) / 86400);

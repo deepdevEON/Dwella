@@ -1,8 +1,21 @@
 /// <reference types="vite/client" />
 export {};
 declare global {
+  interface ImportMetaEnv {
+    readonly VITE_AUTH_API_URL?: string;
+    readonly VITE_TRADING_BRIDGE_URL?: string;
+    readonly VITE_TRADING_BRIDGE_TOKEN?: string;
+    readonly VITE_PLAYWRIGHT_TRADER_URL?: string;
+    readonly VITE_PLAYWRIGHT_TRADER_TOKEN?: string;
+    /** @deprecated Backward-compatible aliases for older Browserbase setup. */
+    readonly VITE_BROWSERBASE_TRADER_URL?: string;
+    readonly VITE_BROWSERBASE_TRADER_TOKEN?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
   interface Window { dwella: {
-    platform:string; windowControls:{minimize:()=>Promise<void>;toggleMaximize:()=>Promise<void>;close:()=>Promise<void>;isMaximized:()=>Promise<boolean>;onMaxChanged:(cb:(isMax:boolean)=>void)=>()=>void}; hasLocalLogin:()=>Promise<boolean>; createLocalLogin:(password:string)=>Promise<ActionResult>; verifyLocalLogin:(password:string)=>Promise<ActionResult>; clearLocalLogin:()=>Promise<ActionResult>; getSystemStatus:()=>Promise<SystemStatus>; startHermes:()=>Promise<ActionResult>; stopHermes:()=>Promise<ActionResult>; askHermes:(input:string)=>Promise<ActionResult>; openExternal:(url:string)=>Promise<void>; getMarketQuotes:()=>Promise<MarketQuote[]>; getMarketBars:(s:string,tf:string,count?:number)=>Promise<BarsResult>; getAccount:()=>Promise<AccountSummary>; getPositions:()=>Promise<PositionsResult>;
+    platform:string; windowControls:{minimize:()=>Promise<void>;toggleMaximize:()=>Promise<void>;close:()=>Promise<void>;isMaximized:()=>Promise<boolean>;onMaxChanged:(cb:(isMax:boolean)=>void)=>()=>void}; hasLocalLogin:()=>Promise<boolean>; createLocalLogin:(password:string)=>Promise<ActionResult>; verifyLocalLogin:(password:string)=>Promise<ActionResult>; clearLocalLogin:()=>Promise<ActionResult>; getSystemStatus:()=>Promise<SystemStatus>; startHermes:()=>Promise<ActionResult>; stopHermes:()=>Promise<ActionResult>;    askHermes:(input:string)=>Promise<ActionResult>; openTradingViewLogin:()=>Promise<ActionResult>; onTradingViewLoginComplete?:(cb:(data:{ok:boolean})=>void)=>()=>void; openExternal:(url:string)=>Promise<void>; getMarketQuotes:()=>Promise<MarketQuote[]>; getMarketBars:(s:string,tf:string,count?:number)=>Promise<BarsResult>; getAccount:()=>Promise<AccountSummary>; getPositions:()=>Promise<PositionsResult>;
     placeMarketOrder:(data:Record<string,unknown>)=>Promise<OrderResult>;
     placeLimitOrder:(data:Record<string,unknown>)=>Promise<OrderResult>;
     placeStopOrder:(data:Record<string,unknown>)=>Promise<OrderResult>;
@@ -21,6 +34,8 @@ declare global {
       onSignal: (cb: (sig: BuffySignal) => void) => () => void;
     };
   }}
+  interface ElectronAPI { openTradingViewLogin:()=>Promise<ActionResult>; getMarketBars?:(s:string,tf:string,count?:number)=>Promise<BarsResult>; onTradingViewLoginComplete?:(cb:(data:{ok:boolean})=>void)=>()=>void; }
+  interface Window { electronAPI?: ElectronAPI; }
   interface SystemStatus { hermesInstalled:boolean; hermesRunning:boolean; hermesApiHealthy:boolean; zoConfigured?:boolean; platform:string; version?:string; }
   interface ActionResult { ok:boolean; message:string; output?:string; }
   interface OrderResult { ok:boolean; action?:string; symbol?:string; volume?:number; side?:string; entry?:number; stop_loss?:number|null; take_profit?:number|null; stoplimit?:number; order?:string; deal?:string; ticket?:number; price?:number; retcode?:number; detail?:string; error?:string; closed?:number; }

@@ -71,8 +71,10 @@ export function createGCBreakoutStrategy(): Strategy {
       const cached = asianRanges.get(dayKey);
       if (!cached || cached.range <= 0) return;
 
-      const volAvg = sma(bars, volPeriod, index);
-      if (volAvg === null || volAvg <= 0) return;
+      let volumeSum = 0;
+      for (let i = index - volPeriod + 1; i <= index; i++) volumeSum += bars[i].volume;
+      const volAvg = volumeSum / volPeriod;
+      if (volAvg <= 0) return;
 
       const a = atr(bars, atrPeriod, index) ?? 0;
       if (a <= 0) return;

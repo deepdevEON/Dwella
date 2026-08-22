@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-tv_sidecar.py — Dwella TradingView sidecar.
+tv_sidecar.py — Dwella TradingView Desktop sidecar.
 
 Uses the TradingView MCP CLI (tv command) to read live candles, quotes,
-and manage alerts from TradingView Desktop via CDP on port 9222.
+and manage alerts from an already-installed TradingView Desktop session via
+its local CDP endpoint. Dwella never downloads, embeds, or launches the
+proprietary TradingView application.
 
 Endpoints (JSON):
     GET  /status                -> { connected, symbols, last_update, ticks, candle_counts, account, positions }
@@ -21,6 +23,7 @@ Run:  python3 tv_sidecar.py           (default: http 127.0.0.1:18814)
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import pathlib
@@ -54,7 +57,25 @@ except ImportError as exc:
 
 # ── Auto-switch configuration ─────────────────────────────────────────
 # Account changes are always explicit. Never rotate to another account in the background.
-AUTO_SWITCH_ENABLED = False
+AUTO_SWITCH_ENABLED = False  # account switching never arms automation
+
+# Live automation must have one unambiguous entry point. Account saves,
+# account switches, startup reconciliation, and background health loops may
+# all call the shared helper, but only the explicit HTTP control route is
+# allowed to pass an armed=True request through to the strategy module.
+if SCANNER_AVAILABLE:
+    _native_arm_scanner = arm_scanner
+
+    def arm_scanner(scanner, armed):
+        if armed:
+            caller = inspect.currentframe().f_back if inspect.currentframe() else None
+            request_path = caller.f_locals.get("path") if caller else None
+            if request_path != "/scanner/arm":
+                armed = False
+        return _native_arm_scanner(scanner, armed)
+else:
+    def arm_scanner(*_args, **_kwargs):
+        return None
 
 # ── Symbol mapping: Dwella short name → TradingView symbol ────────────
 # Nasdaq = E-mini (NQ1!) — the micro (MNQ1!/ENQ) is intentionally NOT
@@ -123,16 +144,17 @@ _BUNDLED_MCP_DIR = os.environ.get("DWELLA_BUNDLED_MCP_DIR") or (
 _BUNDLED_NODE = os.environ.get("DWELLA_BUNDLED_NODE") or (
     os.path.join(_bundled, "runtime", "node") if _bundled else ""
 )
-# Pinned TradingView Desktop (the exact build Dwella's CDP automation was
-# tested against) is BUILT INTO Dwella's own bundle at
-# Contents/Resources/TradingView.app — the app is inside the app, not a
-# separate install. Its auto-updater is blocked (dead update feed + read-only
-# cache) so the pinned version can never be replaced by a newer, breaking
-# build. A per-user copy in the components dir is kept as a fallback for
-# source-tree dev runs, where no embedded bundle exists.
-_EMBEDDED_TV_APP = os.environ.get("DWELLA_EMBEDDED_TV_APP") or (
-    os.path.join(_bundled, "TradingView.app") if _bundled else ""
-)
+# TradingView Desktop is a local prerequisite, not a Dwella-managed asset.
+# The user installs it from TradingView and signs into Tradovate inside that
+# Desktop session. Dwella only reads the session over localhost CDP.
+_TV_CDP_HOST = os.environ.get("DWELLA_TV_CDP_HOST", "127.0.0.1")
+try:
+    _TV_CDP_PORT = int(os.environ.get("DWELLA_TV_CDP_PORT", "9222"))
+except ValueError:
+    _TV_CDP_PORT = 9222
+# Kept as an empty compatibility value for old packaged environments. It is
+# intentionally never treated as an install source.
+_EMBEDDED_TV_APP = ""
 _USER_TV_APP = os.path.join(_COMPONENTS_DIR, "TradingView.app")
 _USER_MCP_CLI = os.path.join(_COMPONENTS_DIR, "tradingview-mcp", "src", "cli", "index.js")
 _USER_NODE = os.path.join(_COMPONENTS_DIR, "runtime", "node")

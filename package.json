@@ -5,15 +5,20 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/freebuff-preview.mjs",
+    "dev:client": "vite",
+    "preview:install": "bun install && npm install --prefix browserbase-trader && npm exec --prefix browserbase-trader -- playwright install-deps chromium && npm exec --prefix browserbase-trader -- playwright install chromium",
+    "preview:all": "node scripts/freebuff-preview.mjs",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "node scripts/freebuff-preview.mjs",
     "start": "electron .",
     "desktop": "npm run build && electron .",
     "desktop:dev": "DWELLA_REACT_DEV=1 electron .",
-    "mt5": "python3 mt5/mt5_live_server.py"
+    "mt5": "python3 mt5/mt5_live_server.py",
+    "tv": "python3 mt5/tv_desktop_sidecar.py"
   },
   "dependencies": {
+    "framer-motion": "^13.1.0",
     "lucide-react": "^0.380.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -26,6 +31,7 @@
     "electron": "^31.0.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
+    "typescript": "^7.0.2",
     "vite": "^5.2.11"
   }
 }

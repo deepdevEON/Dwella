@@ -10,86 +10,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
 
-const TRADINGVIEW_PARTITION = 'persist:tradingview';
-const TRADINGVIEW_CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-
-function isTradingViewAuthPopup(url) {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    const trustedHost = host === 'accounts.google.com'
-      || host === 'accounts.googleusercontent.com'
-      || host === 'consent.google.com'
-      || host === 'ogs.google.com'
-      || host === 'www.google.com'
-      || host === 'ssl.gstatic.com'
-      || host === 'www.tradingview.com'
-      || host === 'tradingview.com'
-      || host.endsWith('.tradingview.com');
-    if (!trustedHost) return false;
-    return host.includes('google.')
-      || host.includes('gstatic.')
-      || /\/(accounts\/signin|accounts\/login|oauth|authorize|login)/i.test(parsed.pathname + parsed.search)
-      || host.endsWith('tradingview.com');
-  } catch {
-    return false;
-  }
-}
-
-function installTradingViewPopupHandling(contents) {
-  if (!contents || typeof contents.setWindowOpenHandler !== 'function') return;
-  contents.setWindowOpenHandler(({ url }) => {
-    if (!isTradingViewAuthPopup(url)) return { action: 'deny' };
-    return {
-      action: 'allow',
-      overrideBrowserWindowOptions: {
-        width: 520,
-        height: 720,
-        minWidth: 420,
-        minHeight: 560,
-        show: false,
-        title: 'Sign in to TradingView',
-        parent: mainWindow || undefined,
-        modal: false,
-        autoHideMenuBar: true,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-          partition: TRADINGVIEW_PARTITION,
-        },
-      },
-    };
-  });
-
-  contents.on('did-create-window', (childWindow, details) => {
-    if (!isTradingViewAuthPopup(details.url)) return;
-    try {
-      childWindow.setMenuBarVisibility(false);
-      childWindow.setTitle('Sign in to TradingView');
-      childWindow.webContents.setUserAgent(TRADINGVIEW_CHROME_UA);
-      // did-create-window fires after Chromium has created the popup target;
-      // reload once so the very first Google request also uses the Chrome UA.
-      childWindow.webContents.reload();
-      childWindow.once('ready-to-show', () => childWindow.show());
-      childWindow.webContents.on('did-navigate', (_event, url) => {
-        if (/tradingview\.com/i.test(url)) childWindow.setTitle('TradingView sign-in');
-      });
-    } catch (error) {
-      console.error('TradingView sign-in window setup failed:', error);
-    }
-  });
-}
-
-// Dwella IS the host: its own renderer hosts the built-in TradingView
-// webview, and the sidecar automates that webview via Dwella's CDP port.
-// There is no separate TradingView Desktop app on the machine anymore.
-app.commandLine.appendSwitch('remote-debugging-port', '9222');
-app.commandLine.appendSwitch('remote-allow-origins', '*');
-// Google OAuth rejects Electron's default user-agent in some sign-in paths.
-// Use a current Chrome-compatible UA for the embedded TradingView session and
-// its OAuth popup while keeping Dwella itself fully isolated by context.
-app.userAgentFallback = TRADINGVIEW_CHROME_UA;
+// TradingView Desktop is an external local prerequisite. Dwella does not
+// embed it, claim its CDP port, open it, or store its broker credentials.
+// The user starts TradingView Desktop with remote debugging enabled and signs
+// into Tradovate inside that official session before connecting Dwella.
 
 let mainWindow;
 
@@ -115,6 +39,7 @@ if (!hasSingleInstance) {
 
 let fakeSleepProcess = null;
 let fakeSleepSystemOverride = false;
+let tradingViewLoginWindow = null;
 
 // ---------------------------------------------------------------------
 // Dwella data persistence → trading/ folder
@@ -158,8 +83,7 @@ function findBundledResource(relativePath) {
 function ensureBundledComponents() {
   const bundledRuntime = findBundledResource('runtime');
   const bundledMcp = findBundledResource('tradingview-mcp');
-  // TradingView Desktop is built into Dwella's own bundle.
-  const embeddedTv = findBundledResource('TradingView.app');
+  // TradingView Desktop is never copied into or launched from Dwella.
   const installedRuntime = path.join(COMPONENTS_DIR, 'runtime');
   const installedMcp = path.join(COMPONENTS_DIR, 'tradingview-mcp');
   const marker = path.join(COMPONENTS_DIR, '.version');
@@ -201,7 +125,6 @@ function ensureBundledComponents() {
     runtimeDir,
     bundledNode: findBundledResource('runtime/node'),
     bundledMcp: bundledMcp || '',
-    embeddedTv: embeddedTv || '',
   };
 }
 
@@ -220,6 +143,14 @@ function registerIpc() {
     return { ok: true, path: SETTINGS_FILE };
   });
   ipcMain.handle('app:data-path', () => TRADING_DIR);
+  ipcMain.handle('tv:status', async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:18814/tv/status', { signal: AbortSignal.timeout(2500) });
+      return await response.json();
+    } catch {
+      return { connected: false, error: 'The local TradingView Desktop bridge is unavailable.' };
+    }
+  });
   ipcMain.handle('app:open-external', async (_event, value) => {
     try {
       const url = new URL(String(value));
@@ -228,6 +159,58 @@ function registerIpc() {
       return { ok: true };
     } catch {
       return { ok: false, reason: 'The link could not be opened.' };
+    }
+  });
+  ipcMain.handle('tv:login', async () => {
+    if (tradingViewLoginWindow && !tradingViewLoginWindow.isDestroyed()) {
+      tradingViewLoginWindow.show();
+      tradingViewLoginWindow.focus();
+      return { ok: true, reused: true };
+    }
+
+    tradingViewLoginWindow = new BrowserWindow({
+      ...(mainWindow ? { parent: mainWindow } : {}),
+      width: 460,
+      height: 760,
+      minWidth: 380,
+      minHeight: 560,
+      title: 'Sign in to TradingView',
+      backgroundColor: '#f5f3ed',
+      autoHideMenuBar: true,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    let loginResolved = false;
+    const finishTvLogin = () => {
+      if (loginResolved) return;
+      loginResolved = true;
+      if (tradingViewLoginWindow && !tradingViewLoginWindow.isDestroyed()) tradingViewLoginWindow.close();
+      tradingViewLoginWindow = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('tv:login-complete', { ok: true });
+      }
+    };
+    tradingViewLoginWindow.on('closed', () => { tradingViewLoginWindow = null; });
+    tradingViewLoginWindow.webContents.on('did-navigate', (_event, url) => {
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname;
+        const isTv = host === 'tradingview.com' || host.endsWith('.tradingview.com');
+        const path = parsed.pathname.toLowerCase();
+        const stillAuth = path.includes('/accounts/signin') || path.includes('/accounts/signup') || path.includes('/accounts/recover') || path.includes('/accounts/reset');
+        if (isTv && !stillAuth) finishTvLogin();
+      } catch { /* ignore non-TradingView navigation */ }
+    });
+
+    try {
+      await tradingViewLoginWindow.loadURL('https://www.tradingview.com/accounts/signin/');
+      return { ok: true };
+    } catch {
+      if (tradingViewLoginWindow && !tradingViewLoginWindow.isDestroyed()) tradingViewLoginWindow.close();
+      return { ok: false, reason: 'The official TradingView sign-in page could not be opened.' };
     }
   });
   ipcMain.handle('fake-sleep:start', () => startFakeSleep(false));
@@ -401,25 +384,26 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
-      // Hosts the built-in TradingView section: the real TradingView web app
-      // runs inside Dwella's own window (no separate visible TradingView app).
-      webviewTag: true,
+      // TradingView Desktop is a separate local prerequisite. This window
+      // intentionally has no embedded webview or broker credential surface.
     },
     show: false,
   });
 
   const isDev = process.env.NODE_ENV === 'development';
-  // The production desktop shell uses the current Dwella terminal directly.
-  // This keeps the launched app identical to the live HTML preview, including
-  // its TradingView/sidecar data wiring, instead of opening the older React UI.
-  const terminalPath = path.join(__dirname, '../dwella-terminal.html');
+  // The desktop shell uses the same mobile-first React experience as the
+  // web preview. The older terminal HTML remains in the repository as a
+  // legacy fallback only; it is never the normal packaged entrypoint.
+  const reactDistPath = path.join(__dirname, '../dist/index.html');
   const reactDevUrl = 'http://localhost:5173';
 
   if (isDev && process.env.DWELLA_REACT_DEV === '1') {
     mainWindow.loadURL(reactDevUrl);
-  } else if (fs.existsSync(terminalPath)) {
-    mainWindow.loadFile(terminalPath);
+  } else if (fs.existsSync(reactDistPath)) {
+    mainWindow.loadFile(reactDistPath);
   } else {
+    // Keep the entrypoint deterministic: never fall back to the legacy HTML
+    // terminal, which used to embed/open a separate TradingView surface.
     mainWindow.loadURL(reactDevUrl);
   }
 
@@ -474,7 +458,8 @@ function spawnSidecar(script, port, logName) {
       (components.node ? { DWELLA_NODE: components.node } : {})),
     ...(components.bundledMcp ? { DWELLA_BUNDLED_MCP_DIR: components.bundledMcp } : {}),
     ...(components.bundledNode ? { DWELLA_BUNDLED_NODE: components.bundledNode } : {}),
-    ...(components.embeddedTv ? { DWELLA_EMBEDDED_TV_APP: components.embeddedTv } : {}),
+    // Do not inject an embedded TradingView path: the sidecar must detect the
+    // user's pre-installed official Desktop app instead.
     // The standalone Node binary is distributed with its libnode dylib beside
     // it. Point the loader at the per-user copy first, with the bundled path
     // as a fallback for a read-only or first-run cache failure.
@@ -490,7 +475,7 @@ function spawnSidecar(script, port, logName) {
     decided = true;
     try {
       const logFd = fs.openSync(path.join(logDir, logName), 'a');
-      const binaryName = script === 'tv_sidecar.py' ? 'dwella-sidecar' : 'dwella-auth';
+      const binaryName = script === 'tv_desktop_sidecar.py' || script === 'tv_sidecar.py' ? 'dwella-sidecar' : 'dwella-auth';
       // Support both the current flattened app bundle and the newer
       // Resources/bin layout so an installed DMG always uses its bundled
       // runtime instead of silently falling back to system Python.
@@ -533,20 +518,12 @@ app.whenReady().then(async () => {
   createWindow();
 
   // Start both sidecars
-  tvSidecar = await spawnSidecar('tv_sidecar.py', TV_SIDECAR_PORT, 'tv-sidecar.log');
+  tvSidecar = await spawnSidecar('tv_desktop_sidecar.py', TV_SIDECAR_PORT, 'tv-sidecar.log');
   authSidecar = await spawnSidecar('auth_server.py', AUTH_SIDECAR_PORT, 'auth-server.log');
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
-
-app.on('web-contents-created', (_event, contents) => {
-  // This catches the webview guest itself. Google sign-in opens a popup, and
-  // Electron otherwise blocks webview popups or creates them in a different
-  // session. Keeping the same persistent partition is what returns the OAuth
-  // session to the TradingView view that Dwella automates.
-  installTradingViewPopupHandling(contents);
 });
 
 app.on('will-quit', () => {

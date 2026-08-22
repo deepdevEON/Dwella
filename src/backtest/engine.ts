@@ -56,6 +56,8 @@ export interface BarContext {
   bars: Bar[];
   /** Higher-timeframe bars active at the current bar, keyed by timeframe. */
   tf: Record<string, Bar | null>;
+  /** Full higher-timeframe series, used only up to the active bar by strategies. */
+  tfBars?: Partial<Record<Timeframe, Bar[]>>;
   position: Position | null;
   pending: Order[];
   params: StrategyParams;
@@ -139,7 +141,13 @@ export interface Position {
   mae: number;
 }
 
-export type ExitReason = "signal" | "stop" | "take-profit" | "end-of-data" | "margin";
+export type ExitReason =
+  | "signal"
+  | "stop"
+  | "take-profit"
+  | "end-of-data"
+  | "margin"
+  | (string & {});
 
 export interface Trade {
   id: string;
@@ -458,7 +466,7 @@ export class BacktestEngine {
             const exitFill = pos.side === "long"
               ? slip(bar.open, "short", this.slippageTicks, this.tickSize)
               : slip(bar.open, "long", this.slippageTicks, this.tickSize);
-            closePosition(exitFill, "signal", bar);
+            closePosition(exitFill, (req.reason || "signal") as ExitReason, bar);
           }
           if (req.fillBar <= i) exitRequests.splice(e, 1);
         }
@@ -480,6 +488,7 @@ export class BacktestEngine {
         index: i,
         bars,
         tf: alignedTf,
+        tfBars: data.series,
         position,
         pending: [...pending],
         params,

@@ -10,6 +10,26 @@
 
 import { checkDailyLimit } from './strategies.js';
 
+const LOCAL_TRADING_BRIDGE_URL = 'http://127.0.0.1:18814';
+const DESKTOP_RUNTIME = typeof window !== 'undefined'
+  && (window.location.protocol === 'file:' || Boolean(window.electronAPI));
+const CONFIGURED_TRADING_BRIDGE_URL = import.meta.env.VITE_TRADING_BRIDGE_URL || '';
+const LOCAL_BRIDGE_URL_PATTERN = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?(?:\/|$)/i;
+const TRADING_BRIDGE_URL = (
+  typeof window !== 'undefined'
+    && window.location.protocol !== 'file:'
+    && LOCAL_BRIDGE_URL_PATTERN.test(CONFIGURED_TRADING_BRIDGE_URL)
+    ? ''
+    : CONFIGURED_TRADING_BRIDGE_URL || (DESKTOP_RUNTIME ? LOCAL_TRADING_BRIDGE_URL : '')
+).replace(/\/$/, '');
+const TRADING_BRIDGE_TOKEN = import.meta.env.VITE_TRADING_BRIDGE_TOKEN || '';
+
+function bridgeHeaders(headers = {}) {
+  const next = new Headers(headers);
+  if (TRADING_BRIDGE_TOKEN) next.set('Authorization', `Bearer ${TRADING_BRIDGE_TOKEN}`);
+  return next;
+}
+
 // The live scanner deliberately enters one unit per confirmed setup. Keep
 // this helper for analytics/manual previews, but never use it to pyramid an
 // already-triggered live setup.
@@ -112,8 +132,11 @@ export function buildOrder(signal, { accountBalance = 100000, tradeMode = 'paper
   };
 }
 
-// ── Execute an order via the sidecar ───────────────────────────────────────
-export async function executeOrder(order, sidecarUrl = 'http://127.0.0.1:18814') {
+// ── Execute an order via the configured bridge ─────────────────────────────
+export async function executeOrder(order, sidecarUrl = TRADING_BRIDGE_URL) {
+  if (order.tradeMode !== 'paper' && !sidecarUrl) {
+    return { ok: false, error: 'No Linux trading bridge is configured. Paper mode remains available.', order, paper: false };
+  }
   if (order.tradeMode === 'paper') {
     // Paper mode — just return the order as "filled"
     return {
@@ -132,7 +155,7 @@ export async function executeOrder(order, sidecarUrl = 'http://127.0.0.1:18814')
     const res = await fetch(`${sidecarUrl}/tv/order`, {
       signal: ctrl.signal,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         action: order.action,
         symbol: order.symbol,
@@ -152,13 +175,15 @@ export async function executeOrder(order, sidecarUrl = 'http://127.0.0.1:18814')
 }
 
 // ── Cancel an open order ───────────────────────────────────────────────────
-export async function cancelOrder(orderId, sidecarUrl = 'http://127.0.0.1:18814') {
+export async function cancelOrder(orderId, sidecarUrl = TRADING_BRIDGE_URL) {
+  if (!sidecarUrl) return { ok: false, error: 'No Linux trading bridge is configured.' };
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
     const res = await fetch(`${sidecarUrl}/tv/cancel?orderId=${orderId}`, {
       signal: ctrl.signal,
       method: 'DELETE',
+      headers: bridgeHeaders(),
     });
     clearTimeout(t);
     return await res.json();
@@ -168,11 +193,12 @@ export async function cancelOrder(orderId, sidecarUrl = 'http://127.0.0.1:18814'
 }
 
 // ── Fetch open orders ──────────────────────────────────────────────────────
-export async function fetchOpenOrders(sidecarUrl = 'http://127.0.0.1:18814') {
+export async function fetchOpenOrders(sidecarUrl = TRADING_BRIDGE_URL) {
+  if (!sidecarUrl) return { orders: [] };
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
-    const res = await fetch(`${sidecarUrl}/tv/openorders`, { signal: ctrl.signal });
+    const res = await fetch(`${sidecarUrl}/tv/openorders`, { signal: ctrl.signal, headers: bridgeHeaders() });
     clearTimeout(t);
     return await res.json();
   } catch {

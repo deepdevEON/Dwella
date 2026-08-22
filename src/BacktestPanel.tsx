@@ -62,6 +62,7 @@ export default function BacktestPanel() {
     const dm = new DataManager();
     const data = await dm.load(symbol, base, extra, {
       synthetic,
+      requireLive: !synthetic,
       startDate: startDate ? Math.floor(Date.parse(startDate) / 1000) : undefined,
       endDate: endDate ? Math.floor(Date.parse(endDate) / 1000) : undefined,
     });
